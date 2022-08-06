@@ -1,5 +1,5 @@
-# billings
-**billings** is a wrapped **play billing library** (current v4.0.0)
+# billing
+**billing** is a wrapped **play billing library** (current v4.0.0)
 ### WARNING
 ##### !!! Before usage, you need a basic knowlange about and how works Play Billing Library. Write own sample application and try it. !!! Review code and maybe you write better one :-)
 
