@@ -7,7 +7,7 @@ def keystoreProperties = new Properties()
 keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 
 android {
-    compileSdkVersion 33
+    compileSdk 33
     defaultConfig {
         applicationId "com.mgsoftware.myapplication"
         minSdkVersion 23
@@ -52,6 +52,7 @@ android {
     testOptions {
         unitTests.returnDefaultValues = true
     }
+    namespace 'com.example.app'
 }
 
 dependencies {

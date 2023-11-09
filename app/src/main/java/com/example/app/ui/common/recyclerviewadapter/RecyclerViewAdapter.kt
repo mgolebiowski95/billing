@@ -52,10 +52,10 @@ abstract class RecyclerViewAdapter<T> private constructor(private val diffCallba
     private class DiffCallback<T> : DiffUtil.ItemCallback<T>() {
         private var adapter: RecyclerViewAdapter<T>? = null
 
-        override fun areItemsTheSame(oldItem: T, newItem: T): Boolean =
+        override fun areItemsTheSame(oldItem: T & Any, newItem: T & Any): Boolean =
             adapter?.areItemsTheSame(oldItem, newItem) ?: false
 
-        override fun areContentsTheSame(oldItem: T, newItem: T): Boolean =
+        override fun areContentsTheSame(oldItem: T & Any, newItem: T & Any): Boolean =
             adapter?.areContentsTheSame(oldItem, newItem) ?: false
 
         fun setAdapter(adapter: RecyclerViewAdapter<T>?) {
