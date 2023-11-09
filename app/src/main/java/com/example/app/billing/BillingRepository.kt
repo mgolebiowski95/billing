@@ -1,13 +1,13 @@
 package com.example.app.billing
 
-import com.mgsoftware.billing.SkuDetailsSnippet
+import com.mgsoftware.billing.ProductDetailsSnippet
 import kotlinx.coroutines.flow.StateFlow
 
 interface BillingRepository {
-    val skuDetailsSnippetList: StateFlow<Set<SkuDetailsSnippet>>
+    val productDetailsSnippetList: StateFlow<Set<ProductDetailsSnippet>>
     val purchasesList: StateFlow<Set<String>>
 
-    suspend fun updateSkuDetailsSnippetList(value: Set<SkuDetailsSnippet>)
+    suspend fun updateProductDetailsSnippetList(value: Set<ProductDetailsSnippet>)
 
     suspend fun updatePurchasesList(value: Set<String>)
 }

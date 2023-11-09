@@ -13,11 +13,11 @@ class MainFragmentViewModel(
     billingRepository: BillingRepository
 ) : ViewModel() {
     private val _items: Flow<List<Item>> = combineTransform(
-        billingRepository.skuDetailsSnippetList,
+        billingRepository.productDetailsSnippetList,
         billingRepository.purchasesList
-    ) { skuDetailsSnippetList, purchasesList ->
-        val value = skuDetailsSnippetList.map {
-            val element = it.sku
+    ) { productDetailsSnippetList, purchasesList ->
+        val value = productDetailsSnippetList.map {
+            val element = it.id
             val item = Item(element, it.price, !purchasesList.contains(element))
             item
         }

@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.billingclient.api.BillingClient
 import com.mgsoftware.billing.BillingManager
-import com.mgsoftware.billing.SkuDetailsSnippet
+import com.mgsoftware.billing.ProductDetailsSnippet
 import kotlinx.coroutines.launch
 
 class BillingViewModel(
@@ -25,9 +25,9 @@ class BillingViewModel(
         billingManager.closePlayStoreConnection()
     }
 
-    fun launchBillingFlow(activity: Activity, sku: String) {
+    fun launchBillingFlow(activity: Activity, productId: String) {
         viewModelScope.launch {
-            billingManager.launchBillingFlow(activity, sku)
+            billingManager.launchBillingFlow(activity, productId)
         }
     }
 
@@ -35,24 +35,24 @@ class BillingViewModel(
         viewModelScope.launch {
             billingManager.fetchProductDetails(
                 setOf(
-                    AppSkuProvider.GOLD_MONTHLY
+                    AppProductIdProvider.GOLD_MONTHLY
                 ),
-                BillingClient.SkuType.SUBS
+                BillingClient.ProductType.SUBS
             )
             billingManager.fetchProductDetails(
                 setOf(
-                    AppSkuProvider.PREMIUM_CAR,
-                    AppSkuProvider.GAS,
+                    AppProductIdProvider.PREMIUM_CAR,
+                    AppProductIdProvider.GAS,
                 ),
-                BillingClient.SkuType.INAPP
+                BillingClient.ProductType.INAPP
             )
             billingManager.fetchPurchases()
         }
     }
 
-    override fun onProductDetailsListChanged(skuDetailsSnippetList: Set<SkuDetailsSnippet>) {
+    override fun onProductDetailsListChanged(productDetailsSnippetList: Set<ProductDetailsSnippet>) {
         viewModelScope.launch {
-            billingRepository.updateSkuDetailsSnippetList(skuDetailsSnippetList.toSet())
+            billingRepository.updateProductDetailsSnippetList(productDetailsSnippetList.toSet())
         }
     }
 
@@ -62,13 +62,13 @@ class BillingViewModel(
         }
     }
 
-    override fun disburseConsumableEntitlements(sku: String, quantity: Int) {
-        Log.d("echo", "disburseConsumableEntitlements: sku=$sku")
+    override fun disburseConsumableEntitlements(productId: String, quantity: Int) {
+        Log.d("echo", "disburseConsumableEntitlements: productId=$productId")
     }
 
-    override fun onPurchaseAcknowledged(sku: String) {
+    override fun onPurchaseAcknowledged(productId: String) {
     }
 
-    override fun onPurchaseConsumed(sku: String) {
+    override fun onPurchaseConsumed(productId: String) {
     }
 }

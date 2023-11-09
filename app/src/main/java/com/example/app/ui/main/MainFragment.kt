@@ -47,7 +47,7 @@ class MainFragment : Fragment() {
             values,
             onItemClick = { item ->
                 if (item.canBePurchased)
-                    billingViewModel.launchBillingFlow(requireActivity(), item.sku)
+                    billingViewModel.launchBillingFlow(requireActivity(), item.productId)
                 else
                     messenger.showMessage("Item already owned.", Toast.LENGTH_SHORT)
             })

@@ -6,7 +6,7 @@ import android.util.Log
 import com.android.billingclient.api.*
 import com.mgsoftware.billing.BuildConfig
 import com.mgsoftware.billing.PurchaseValidator
-import com.mgsoftware.billing.SkuProvider
+import com.mgsoftware.billing.ProductIdProvider
 import com.mgsoftware.billing.common.BaseObservable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -14,7 +14,7 @@ import kotlinx.coroutines.withContext
 
 class PlayStoreDataSource(
     application: Application,
-    private val skuProvider: SkuProvider,
+    private val productIdProvider: ProductIdProvider,
     private val purchaseValidator: PurchaseValidator
 ) : BaseObservable<PlayStoreDataSource.Listener>(), BillingClientStateListener {
 
@@ -29,9 +29,9 @@ class PlayStoreDataSource(
             callFromOnPurchasesUpdated: Boolean
         )
 
-        fun onPurchaseAcknowledged(sku: String)
+        fun onPurchaseAcknowledged(productId: String)
 
-        fun onPurchaseConsumed(sku: String, quantity: Int)
+        fun onPurchaseConsumed(productId: String, quantity: Int)
     }
 
     private var billingClient: BillingClient
@@ -62,49 +62,71 @@ class PlayStoreDataSource(
     }
 
     override fun onBillingServiceDisconnected() {
-        if (BuildConfig.DEBUG)
+        if (BuildConfig.DEBUG) {
             Log.d(TAG, "onBillingServiceDisconnected")
+        }
+
         openConnection()
     }
 
     fun openConnection() {
         if (!billingClient.isReady)
             billingClient.startConnection(this)
-        if (BuildConfig.DEBUG)
+
+        if (BuildConfig.DEBUG) {
             Log.d(TAG, "openConnection")
+        }
     }
 
     fun closeConnection() {
         billingClient.endConnection()
-        if (BuildConfig.DEBUG)
+
+        if (BuildConfig.DEBUG) {
             Log.d(TAG, "closeConnection")
+        }
     }
 
     fun isReady() = billingClient.isReady
 
-    suspend fun querySkuDetails(
-        sku: String,
-        @BillingClient.SkuType skuType: String
-    ): SkuDetailsResult {
-        val skuList = setOf(sku)
-        if (BuildConfig.DEBUG)
-            Log.d(TAG, "querySkuDetails: skuList=$skuList")
-        return querySkuDetails(skuList, skuType)
+    suspend fun queryProductDetails(
+        productId: String,
+        @BillingClient.ProductType productType: String
+    ): ProductDetailsResult {
+        val productIds = setOf(productId)
+        return queryProductDetails(productIds, productType)
     }
 
-    suspend fun querySkuDetails(
-        skuList: Set<String>,
-        @BillingClient.SkuType skuType: String
-    ): SkuDetailsResult {
-        if (BuildConfig.DEBUG)
-            Log.d(TAG, "querySkuDetails: skuList=$skuList")
-        val params = SkuDetailsParams.newBuilder()
-        params.setSkusList(skuList.toList())
-        params.setType(skuType)
+    suspend fun queryProductDetails(
+        productIds: Set<String>,
+        @BillingClient.ProductType productType: String
+    ): ProductDetailsResult {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "queryProductDetails: productIds=$productIds")
+        }
+
         return withContext(Dispatchers.IO) {
-            billingClient.querySkuDetails(params.build())
+            val params = prepareQueryProductDetailsParams(
+                productIds,
+                productType
+            )
+            billingClient.queryProductDetails(params)
         }
     }
+
+    private fun prepareQueryProductDetailsParams(
+        productIds: Set<String>,
+        @BillingClient.ProductType productType: String
+    ) = QueryProductDetailsParams
+        .newBuilder()
+        .setProductList(
+            productIds.map { productId ->
+                QueryProductDetailsParams.Product.newBuilder()
+                    .setProductId(productId)
+                    .setProductType(productType)
+                    .build()
+            }
+        )
+        .build()
 
     /**
      * callbacks:
@@ -112,66 +134,194 @@ class PlayStoreDataSource(
      * disburseNonConsumableEntitlements
      */
     suspend fun queryPurchasesAsync() = withContext(Dispatchers.IO) {
-        if (BuildConfig.DEBUG)
+        if (BuildConfig.DEBUG) {
             Log.d(TAG, "queryPurchasesAsync")
+        }
+
         val purchasesList = mutableSetOf<Purchase>()
-        val inappResult = billingClient.queryPurchases(BillingClient.SkuType.INAPP)
-        purchasesList.addAll(inappResult.purchasesList.orEmpty())
+        val params = QueryPurchasesParams.newBuilder()
+        params.setProductType(BillingClient.ProductType.INAPP)
+        val inappResult = billingClient.queryPurchasesAsync(params.build())
+
+        purchasesList.addAll(inappResult.purchasesList)
         if (isSubscriptionSupported()) {
-            val subsResult = billingClient.queryPurchases(BillingClient.SkuType.SUBS)
-            purchasesList.addAll(subsResult.purchasesList.orEmpty())
+            val subsResult = billingClient.queryPurchasesAsync(
+                QueryPurchasesParams.newBuilder()
+                    .setProductType(BillingClient.ProductType.SUBS)
+                    .build()
+            )
+            purchasesList.addAll(subsResult.purchasesList)
         }
         if (purchasesList.isNotEmpty()) {
-            if (BuildConfig.DEBUG)
+            if (BuildConfig.DEBUG) {
                 Log.d(TAG, "Purchases to be processed: $purchasesList")
+            }
+
             processPurchases(purchasesList, false)
         } else {
-            if (BuildConfig.DEBUG)
+            if (BuildConfig.DEBUG) {
                 Log.d(TAG, "There are no purchases.")
+            }
+
             getListeners().forEach { it.disburseNonConsumableEntitlements(emptySet(), false) }
         }
     }
 
-    suspend fun launchBillingFlow(activity: Activity, skuDetails: SkuDetails) {
-        if (BuildConfig.DEBUG)
-            Log.d(TAG, "launchBillingFlow: ${skuDetails.sku}")
+    suspend fun launchBillingFlow(activity: Activity, productDetails: ProductDetails) {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "launchBillingFlow: ${productDetails.productId}")
+        }
+
         val params = BillingFlowParams.newBuilder()
-        params.setSkuDetails(skuDetails)
+        val productDetailsParamsList =
+            listOf(
+                BillingFlowParams.ProductDetailsParams.newBuilder()
+                    .setProductDetails(productDetails)
+                    .build()
+            )
+        params.setProductDetailsParamsList(productDetailsParamsList)
         billingClient.launchBillingFlow(activity, params.build())
         val result = purchaseChannel.receive()
 
-        if (BuildConfig.DEBUG)
-            Log.d(TAG, "onPurchasesUpdated")
-        when (result.billingResult.responseCode) {
+        val responseCode = result.billingResult.responseCode
+        if (BuildConfig.DEBUG) {
+            val message =
+                billingResponseCodeMessage(responseCode) ?: result.billingResult.debugMessage
+            Log.d(TAG, "onPurchasesUpdated: $message")
+        }
+
+        when (responseCode) {
             BillingClient.BillingResponseCode.OK -> {
-                if (result.purchases.isEmpty())
+                if (result.purchases.isEmpty()) {
                     Log.d(TAG, "Empty Purchase List Returned from OK response!")
-                else
+                } else {
                     processPurchases(result.purchases.toSet(), true)
+                }
             }
-            BillingClient.BillingResponseCode.USER_CANCELED ->
-                Log.i(TAG, "onPurchasesUpdated: User canceled the purchase")
+
             BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> {
-                Log.w(
-                    TAG,
-                    "item already owned? call queryPurchases to verify and process all such items"
-                )
                 queryPurchasesAsync()
             }
-            BillingClient.BillingResponseCode.DEVELOPER_ERROR -> Log.e(
-                TAG,
-                "onPurchasesUpdated: Developer error means that Google Play " +
-                        "does not recognize the configuration. If you are just getting started, " +
-                        "make sure you have configured the application correctly in the " +
-                        "Google Play Console. The SKU product ID must match and the APK you " +
-                        "are using must be signed with release keys."
-            )
+
             BillingClient.BillingResponseCode.SERVICE_DISCONNECTED -> {
                 openConnection()
             }
-            else -> {
-                Log.w(TAG, result.billingResult.debugMessage)
+        }
+    }
+
+    /**
+     * https://developer.android.com/reference/com/android/billingclient/api/BillingClient.BillingResponseCode
+     */
+    private fun billingResponseCodeMessage(@BillingClient.BillingResponseCode responseCode: Int): String? {
+        return when (responseCode) {
+            BillingClient.BillingResponseCode.BILLING_UNAVAILABLE -> {
+                """
+                    A user billing error occurred during processing.
+
+                    Examples where this error may occur:
+
+                    The Play Store app on the user's device is out of date.
+                    The user is in an unsupported country.
+                    The user is an enterprise user and their enterprise admin has disabled users from making purchases.
+                    Google Play is unable to charge the user’s payment method.
+                    Letting the user retry may succeed if the condition causing the error has changed (e.g. An enterprise user's admin has allowed purchases for the organization).
+                """.trimIndent()
             }
+
+            BillingClient.BillingResponseCode.DEVELOPER_ERROR -> {
+                """
+                    Error resulting from incorrect usage of the API.
+
+                    Examples where this error may occur:
+
+                    Invalid arguments such as providing an empty product list where required.
+                    Misconfiguration of the app such as not signing the app or not having the necessary permissions in the manifest.
+                """.trimIndent()
+            }
+
+            BillingClient.BillingResponseCode.ERROR -> {
+                """
+                    Fatal error during the API action.
+
+                    This is an internal Google Play error that may be transient or due to an unexpected condition during processing. You can automatically retry (e.g. with exponential back off) for this case and contact Google Play if issues persist. Be mindful of how long you retry if the retry is happening during a user interaction.
+                """.trimIndent()
+            }
+
+            BillingClient.BillingResponseCode.FEATURE_NOT_SUPPORTED -> {
+                """
+                    The requested feature is not supported by the Play Store on the current device.
+
+                    If your app would like to check if a feature is supported before trying to use the feature your app can call BillingClient.isFeatureSupported(String) to check if a feature is supported. For a list of feature types that can be supported, see BillingClient.FeatureType.
+
+                    For example: Before calling BillingClient.showInAppMessages(Activity, InAppMessageParams, InAppMessageResponseListener) API, you can call BillingClient.isFeatureSupported(String) with the BillingClient.FeatureType.IN_APP_MESSAGING featureType to check if it is supported.
+                """.trimIndent()
+            }
+
+            BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> {
+                """
+                    The purchase failed because the item is already owned.
+
+                    Make sure your app is up-to-date with recent purchases using guidance in the Fetching purchases section in the integration guide. If this error occurs despite making the check for recent purchases, then it may be due to stale purchase information that was cached on the device by Play. When you receive this error, the cache should get updated. After this, your purchases should be reconciled, and you can process them as outlined in the processing purchases section in the integration guide.
+                """.trimIndent()
+            }
+
+            BillingClient.BillingResponseCode.ITEM_NOT_OWNED -> {
+                """
+                    Requested action on the item failed since it is not owned by the user.
+
+                    Make sure your app is up-to-date with recent purchases using guidance in the Fetching purchases section in the integration guide. If this error occurs despite making the check for recent purchases, then it may be due to stale purchase information cached on the device by Play. When you receive this error, the cache should get updated. After this, your purchases should be reconciled, and you can process the purchases accordingly. For example, if you are trying to consume an item and if the updated purchase information says it is already consumed, you can ignore the error now.
+                """.trimIndent()
+            }
+
+            BillingClient.BillingResponseCode.ITEM_UNAVAILABLE -> {
+                """
+                    The requested product is not available for purchase.
+
+                    Please ensure the product is available in the user’s country. If you recently changed the country availability and are still receiving this error then it may be because of a propagation delay.
+                """.trimIndent()
+            }
+
+            BillingClient.BillingResponseCode.NETWORK_ERROR -> {
+                """
+                    A network error occurred during the operation.
+
+                    This error indicates that there was a problem with the network connection between the device and Play systems. This could potentially also be due to the user not having an active network connection.
+                """.trimIndent()
+            }
+
+            BillingClient.BillingResponseCode.OK -> {
+                """
+                    Success.
+                """.trimIndent()
+            }
+
+            BillingClient.BillingResponseCode.SERVICE_DISCONNECTED -> {
+                """
+                    The app is not connected to the Play Store service via the Google Play Billing Library.
+
+                    Examples where this error may occur:
+
+                    The Play Store could have been updated in the background while your app was still running and the library lost connection.
+                    BillingClient.startConnection(BillingClientStateListener) was never called or has not completed yet.
+                    Since this state is transient, your app should automatically retry (e.g. with exponential back off) to recover from this error. Be mindful of how long you retry if the retry is happening during a user interaction. The retry should lead to a call to BillingClient.startConnection(BillingClientStateListener) right after or in some time after you received this code.
+                """.trimIndent()
+            }
+
+            BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE -> {
+                """
+                    The service is currently unavailable.
+
+                    Since this state is transient, your app should automatically retry (e.g. with exponential back off) to recover from this error. Be mindful of how long you retry if the retry is happening during a user interaction.
+                """.trimIndent()
+            }
+
+            BillingClient.BillingResponseCode.USER_CANCELED -> {
+                """
+                    Transaction was canceled by the user.
+                """.trimIndent()
+            }
+
+            else -> null
         }
     }
 
@@ -179,15 +329,17 @@ class PlayStoreDataSource(
         purchases: Set<Purchase>,
         callFromOnPurchasesUpdated: Boolean
     ) {
-        if (BuildConfig.DEBUG)
+        if (BuildConfig.DEBUG) {
             Log.d(
                 TAG,
                 "processPurchases: ${
                     purchases.joinToString(
                         separator = ", ",
-                        transform = { it.skus[0] })
+                        transform = { it.products[0] })
                 }"
             )
+        }
+
         val validPurchases = purchases.filter { purchase ->
             if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED)
                 isSignatureValid(purchase)
@@ -196,12 +348,14 @@ class PlayStoreDataSource(
         }
 
         val (consumables, nonConsumables) = validPurchases.partition {
-            val consumableSkus = skuProvider.getConsumableSkus()
-            consumableSkus.contains(it.skus[0])
+            val consumableProductIds = productIdProvider.getConsumableProductIds()
+            consumableProductIds.contains(it.products[0])
         }
         if (consumables.isNotEmpty()) {
-            if (BuildConfig.DEBUG)
+            if (BuildConfig.DEBUG) {
                 Log.d(TAG, "Number of purchases to be consumed: ${consumables.size}")
+            }
+
             processConsumablePurchases(consumables)
         }
         if (nonConsumables.isNotEmpty()) {
@@ -212,8 +366,10 @@ class PlayStoreDataSource(
     }
 
     private suspend fun processConsumablePurchases(purchases: List<Purchase>) {
-        if (BuildConfig.DEBUG)
+        if (BuildConfig.DEBUG) {
             Log.d(TAG, "processConsumablePurchases")
+        }
+
         purchases.forEach { purchase ->
             consumePurchase(purchase)
         }
@@ -226,28 +382,36 @@ class PlayStoreDataSource(
         purchaseConsumptionInProcess.add(purchase)
         val params = ConsumeParams.newBuilder()
         params.setPurchaseToken(purchase.purchaseToken)
-        if (BuildConfig.DEBUG)
-            Log.d(TAG, "consumePurchase: ${purchase.skus[0]}")
-        val (billingResult, purchaseToken) = billingClient.consumePurchase(params.build())
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "consumePurchase: ${purchase.products[0]}")
+        }
+
+        val (billingResult, purchaseToken) = withContext(Dispatchers.IO) {
+            billingClient.consumePurchase(params.build())
+        }
         purchaseConsumptionInProcess.remove(purchase)
 
         when (billingResult.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
-                if (BuildConfig.DEBUG)
+                if (BuildConfig.DEBUG) {
                     Log.d(TAG, "consumeResult: success")
+                }
+
                 getListeners().forEach {
                     it.onPurchaseConsumed(
-                        purchase.skus[0],
+                        purchase.products[0],
                         purchase.quantity
                     )
                 }
             }
+
             else -> {
                 if (BuildConfig.DEBUG)
                     Log.d(
                         TAG,
                         "consumeResult: error: responseCode=${billingResult.responseCode} => debugMessage=${billingResult.debugMessage}"
                     )
+
                 Log.w(TAG, billingResult.debugMessage)
             }
         }
@@ -257,8 +421,10 @@ class PlayStoreDataSource(
         purchases: List<Purchase>,
         callFromOnPurchasesUpdated: Boolean
     ) {
-        if (BuildConfig.DEBUG)
+        if (BuildConfig.DEBUG) {
             Log.d(TAG, "processNonConsumablePurchases")
+        }
+
         val acknowledgedPurchases = purchases.filterTo(mutableSetOf()) { purchase ->
             if (!purchase.isAcknowledged) {
                 acknowledgePurchase(purchase)
@@ -277,15 +443,18 @@ class PlayStoreDataSource(
     private suspend fun acknowledgePurchase(purchase: Purchase): Boolean {
         val params = AcknowledgePurchaseParams.newBuilder()
         params.setPurchaseToken(purchase.purchaseToken)
-        if (BuildConfig.DEBUG)
-            Log.d(TAG, "acknowledgePurchase: ${purchase.skus[0]}")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "acknowledgePurchase: ${purchase.products[0]}")
+        }
+
         val billingResult = billingClient.acknowledgePurchase(params.build())
         return when (billingResult.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
                 Log.d(TAG, "acknowledgeResult success")
-                getListeners().forEach { it.onPurchaseAcknowledged(purchase.skus[0]) }
+                getListeners().forEach { it.onPurchaseAcknowledged(purchase.products[0]) }
                 true
             }
+
             else -> {
                 Log.w(
                     TAG,
@@ -307,10 +476,12 @@ class PlayStoreDataSource(
             BillingClient.BillingResponseCode.OK -> {
                 true
             }
+
             BillingClient.BillingResponseCode.SERVICE_DISCONNECTED -> {
                 openConnection()
                 false
             }
+
             else -> {
                 Log.w(TAG, "isSubscriptionSupported() error: ${billingResult.debugMessage}")
                 false

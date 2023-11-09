@@ -19,7 +19,7 @@ import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
 val appModule = module {
-    single<SkuProvider> { AppSkuProvider() }
+    single<ProductIdProvider> { AppProductIdProvider() }
     single<KeyProvider> { FakeKeyProvider() }
     single<PurchaseValidator> { DefaultPurchaseValidator(get()) }
     single { PlayStoreDataSource(androidApplication(), get(), get()) }
@@ -36,32 +36,32 @@ val appModule = module {
     viewModel { MainFragmentViewModel(get()) }
 }
 
-private fun provideFakeBillingManager(skuProvider: SkuProvider): BillingManager {
-    val impl = FakeBillingManager(skuProvider)
+private fun provideFakeBillingManager(productIdProvider: ProductIdProvider): BillingManager {
+    val impl = FakeBillingManager(productIdProvider)
     impl.addProductDetails(
         createFakeProductDetails(
-            AppSkuProvider.GOLD_MONTHLY,
-            BillingClient.SkuType.SUBS
+            AppProductIdProvider.GOLD_MONTHLY,
+            BillingClient.ProductType.SUBS
         )
     )
     impl.addProductDetails(
         createFakeProductDetails(
-            AppSkuProvider.PREMIUM_CAR,
-            BillingClient.SkuType.INAPP
+            AppProductIdProvider.PREMIUM_CAR,
+            BillingClient.ProductType.INAPP
         )
     )
     impl.addProductDetails(
         createFakeProductDetails(
-            AppSkuProvider.GAS,
-            BillingClient.SkuType.INAPP
+            AppProductIdProvider.GAS,
+            BillingClient.ProductType.INAPP
         )
     )
     return impl
 }
 
 private fun createFakeProductDetails(
-    sku: String,
-    @BillingClient.SkuType skuType: String
-): SkuDetailsSnippet {
-    return SkuDetailsSnippet(sku, skuType, "test", "test", "test")
+    productId: String,
+    @BillingClient.ProductType productType: String
+): ProductDetailsSnippet {
+    return ProductDetailsSnippet(productId, productType, "test", "test", "test")
 }

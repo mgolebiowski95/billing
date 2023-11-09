@@ -3,22 +3,22 @@ package com.mgsoftware.billing.impl
 import android.app.Activity
 import com.android.billingclient.api.Purchase
 import com.mgsoftware.billing.BillingManager
-import com.mgsoftware.billing.SkuDetailsSnippet
-import com.mgsoftware.billing.SkuProvider
+import com.mgsoftware.billing.ProductDetailsSnippet
+import com.mgsoftware.billing.ProductIdProvider
 import com.mgsoftware.billing.common.BaseObservable
 import com.mgsoftware.billing.utility.intersect
 
 class FakeBillingManager(
-    private val skuProvider: SkuProvider,
+    private val productIdProvider: ProductIdProvider,
 
     ) : BaseObservable<BillingManager.Listener>(),
     BillingManager {
 
     // remote
-    private val _skuDetailsSnippetMap = mutableMapOf<String, SkuDetailsSnippet>()
+    private val _productDetailsSnippetMap = mutableMapOf<String, ProductDetailsSnippet>()
 
     // local
-    private val skuDetailsSnippetMap = mutableMapOf<String, SkuDetailsSnippet>()
+    private val productDetailsSnippetMap = mutableMapOf<String, ProductDetailsSnippet>()
 
     // remote
     private val _purchasesList = mutableSetOf<String>()
@@ -26,12 +26,12 @@ class FakeBillingManager(
     // local
     private val purchasesList = mutableSetOf<String>()
 
-    fun addProductDetails(skuDetailsSnippet: SkuDetailsSnippet) {
-        _skuDetailsSnippetMap[skuDetailsSnippet.sku] = skuDetailsSnippet
+    fun addProductDetails(productDetailsSnippet: ProductDetailsSnippet) {
+        _productDetailsSnippetMap[productDetailsSnippet.id] = productDetailsSnippet
     }
 
-    fun addPurchase(sku: String) {
-        _purchasesList.add(sku)
+    fun addPurchase(productId: String) {
+        _purchasesList.add(productId)
     }
 
     override fun onBillingSetupSuccess() {
@@ -47,10 +47,10 @@ class FakeBillingManager(
     ) {
     }
 
-    override fun onPurchaseAcknowledged(sku: String) {
+    override fun onPurchaseAcknowledged(productId: String) {
     }
 
-    override fun onPurchaseConsumed(sku: String, quantity: Int) {
+    override fun onPurchaseConsumed(productId: String, quantity: Int) {
     }
 
     override fun openPlayStoreConnection() {
@@ -60,12 +60,12 @@ class FakeBillingManager(
     override fun closePlayStoreConnection() {
     }
 
-    override suspend fun fetchProductDetails(skuList: Set<String>, skuType: String) {
+    override suspend fun fetchProductDetails(productIds: Set<String>, productType: String) {
         getListeners().forEach {
-            _skuDetailsSnippetMap.values.intersect { skuList.contains(it.sku) }.forEach {
-                skuDetailsSnippetMap[it.sku] = it
+            _productDetailsSnippetMap.values.intersect { productIds.contains(it.id) }.forEach {
+                productDetailsSnippetMap[it.id] = it
             }
-            it.onProductDetailsListChanged(skuDetailsSnippetMap.values.toSet())
+            it.onProductDetailsListChanged(productDetailsSnippetMap.values.toSet())
         }
     }
 
@@ -73,22 +73,22 @@ class FakeBillingManager(
         purchasesList.addAll(_purchasesList)
     }
 
-    override suspend fun launchBillingFlow(activity: Activity, sku: String) {
+    override suspend fun launchBillingFlow(activity: Activity, productId: String) {
 
         // fake acknowledge acknowledged product
-        if (skuProvider.getNonConsumableSkus().contains(sku)) {
-            getListeners().forEach { it.onPurchaseAcknowledged(sku) }
-            purchasesList.add(sku)
+        if (productIdProvider.getNonConsumableProductIds().contains(productId)) {
+            getListeners().forEach { it.onPurchaseAcknowledged(productId) }
+            purchasesList.add(productId)
             getListeners().forEach { it.onPurchasesListChanged(purchasesList) }
         }
 
         // fake consuming consumable product
-        if (skuProvider.getConsumableSkus().contains(sku)) {
+        if (productIdProvider.getConsumableProductIds().contains(productId)) {
             getListeners().forEach {
-                it.onPurchaseConsumed(sku)
+                it.onPurchaseConsumed(productId)
             }
             getListeners().forEach {
-                it.disburseConsumableEntitlements(sku, 1)
+                it.disburseConsumableEntitlements(productId, 1)
             }
         }
     }

@@ -1,7 +1,7 @@
 package com.mgsoftware.billing
 
-data class SkuDetailsSnippet(
-    val sku: String,
+data class ProductDetailsSnippet(
+    val id: String,
     val type: String,
     val price: String,
     val title: String,

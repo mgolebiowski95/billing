@@ -21,7 +21,7 @@ class ItemViewHolder(
 
     override fun bind(item: Item) {
         val sb = StringBuilder()
-        sb.appendLine("sku=${item.sku}")
+        sb.appendLine("productId=${item.productId}")
         binding.textView.text = sb.toString()
 
         if (item.canBePurchased)

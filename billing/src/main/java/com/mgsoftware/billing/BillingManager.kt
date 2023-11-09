@@ -12,15 +12,15 @@ interface BillingManager : Observable<BillingManager.Listener>, PlayStoreDataSou
 
         fun onBillingClientReady()
 
-        fun onProductDetailsListChanged(skuDetailsSnippetList: Set<SkuDetailsSnippet>)
+        fun onProductDetailsListChanged(productDetailsSnippetList: Set<ProductDetailsSnippet>)
 
         fun onPurchasesListChanged(purchasesList: Set<String>)
 
-        fun disburseConsumableEntitlements(sku: String, quantity: Int)
+        fun disburseConsumableEntitlements(productId: String, quantity: Int)
 
-        fun onPurchaseAcknowledged(sku: String)
+        fun onPurchaseAcknowledged(productId: String)
 
-        fun onPurchaseConsumed(sku: String)
+        fun onPurchaseConsumed(productId: String)
     }
 
     override fun onBillingSetupSuccess()
@@ -40,9 +40,9 @@ interface BillingManager : Observable<BillingManager.Listener>, PlayStoreDataSou
 
     fun closePlayStoreConnection()
 
-    suspend fun fetchProductDetails(skuList: Set<String>, @BillingClient.SkuType skuType: String)
+    suspend fun fetchProductDetails(productIds: Set<String>, @BillingClient.ProductType productType: String)
 
     suspend fun fetchPurchases()
 
-    suspend fun launchBillingFlow(activity: Activity, sku: String)
+    suspend fun launchBillingFlow(activity: Activity, productId: String)
 }

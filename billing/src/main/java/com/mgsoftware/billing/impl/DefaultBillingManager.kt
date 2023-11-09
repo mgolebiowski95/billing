@@ -3,16 +3,16 @@ package com.mgsoftware.billing.impl
 import android.app.Activity
 import android.util.Log
 import com.android.billingclient.api.BillingClient
+import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
-import com.android.billingclient.api.SkuDetails
 import com.mgsoftware.billing.BillingManager
-import com.mgsoftware.billing.SkuDetailsSnippet
+import com.mgsoftware.billing.ProductDetailsSnippet
 import com.mgsoftware.billing.common.BaseObservable
 
 class DefaultBillingManager(
     private val playStoreBillingClient: PlayStoreDataSource
 ) : BaseObservable<BillingManager.Listener>(), BillingManager {
-    private val skuDetailsMap = mutableMapOf<String, SkuDetails>()
+    private val productIdDetailsMap = mutableMapOf<String, ProductDetails>()
     private val purchasesList = mutableSetOf<String>()
 
     init {
@@ -37,17 +37,17 @@ class DefaultBillingManager(
     ) {
         if (!callFromOnPurchasesUpdated)
             this.purchasesList.clear()
-        this.purchasesList.addAll(purchases.map { it.skus[0] })
+        this.purchasesList.addAll(purchases.map { it.products[0] })
         getListeners().forEach { it.onPurchasesListChanged(this.purchasesList) }
     }
 
-    override fun onPurchaseAcknowledged(sku: String) {
-        getListeners().forEach { it.onPurchaseAcknowledged(sku) }
+    override fun onPurchaseAcknowledged(productId: String) {
+        getListeners().forEach { it.onPurchaseAcknowledged(productId) }
     }
 
-    override fun onPurchaseConsumed(sku: String, quantity: Int) {
-        getListeners().forEach { it.onPurchaseConsumed(sku) }
-        getListeners().forEach { it.disburseConsumableEntitlements(sku, quantity) }
+    override fun onPurchaseConsumed(productId: String, quantity: Int) {
+        getListeners().forEach { it.onPurchaseConsumed(productId) }
+        getListeners().forEach { it.disburseConsumableEntitlements(productId, quantity) }
     }
 
     override fun openPlayStoreConnection() {
@@ -61,22 +61,22 @@ class DefaultBillingManager(
     }
 
     override suspend fun fetchProductDetails(
-        skuList: Set<String>,
-        @BillingClient.SkuType skuType: String
+        productIds: Set<String>,
+        @BillingClient.ProductType productType: String
     ) {
         if (playStoreBillingClient.isReady()) {
-            val skuDetailsResult = playStoreBillingClient.querySkuDetails(skuList, skuType)
-            val billingResult = skuDetailsResult.billingResult
+            val productDetailsResult = playStoreBillingClient.queryProductDetails(productIds, productType)
+            val billingResult = productDetailsResult.billingResult
             Log.d(
                 TAG,
-                "fetchProductDetails: responseCode=${billingResult.responseCode}, debugMessage=${billingResult.debugMessage}, skuDetailsList=${skuDetailsResult.skuDetailsList}"
+                "fetchProductDetails: responseCode=${billingResult.responseCode}, debugMessage=${billingResult.debugMessage}, productDetailsList=${productDetailsResult.productDetailsList}"
             )
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                skuDetailsResult.skuDetailsList?.forEach {
-                    skuDetailsMap[it.sku] = it
+                productDetailsResult.productDetailsList?.forEach {
+                    productIdDetailsMap[it.productId] = it
                 }
                 getListeners().forEach {
-                    it.onProductDetailsListChanged(skuDetailsMap.values.map { it.toSkuDetailsSnippet() }
+                    it.onProductDetailsListChanged(productIdDetailsMap.values.map { it.toProductDetailsSnippet() }
                         .toSet())
                 }
             }
@@ -91,23 +91,31 @@ class DefaultBillingManager(
         }
     }
 
-    override suspend fun launchBillingFlow(activity: Activity, sku: String) {
-        val skuDetails = skuDetailsMap[sku]
-        if (playStoreBillingClient.isReady() && skuDetails != null) {
+    override suspend fun launchBillingFlow(activity: Activity, productId: String) {
+        val productDetails = productIdDetailsMap[productId]
+        if (playStoreBillingClient.isReady() && productDetails != null) {
             playStoreBillingClient.launchBillingFlow(
                 activity,
-                skuDetails
+                productDetails
             )
         } else {
             Log.w(TAG, "Can't launchBillingFlow because playStoreBillingClient not ready yet.")
         }
     }
 
-    private fun SkuDetails.toSkuDetailsSnippet(): SkuDetailsSnippet {
-        return SkuDetailsSnippet(
-            sku,
-            type,
-            price,
+    private fun ProductDetails.toProductDetailsSnippet(): ProductDetailsSnippet {
+        return ProductDetailsSnippet(
+            productId,
+            productType,
+            oneTimePurchaseOfferDetails
+                ?.formattedPrice
+                ?: subscriptionOfferDetails
+                    ?.get(0)
+                    ?.pricingPhases
+                    ?.pricingPhaseList
+                    ?.get(0)
+                    ?.formattedPrice
+                ?: "???",
             title,
             description,
         )
