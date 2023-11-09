@@ -16,9 +16,9 @@ and adding the aar dependency to your `build.gradle` file:
 dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4"
-    implementation "com.android.billingclient:billing-ktx:4.0.0"
+    implementation "com.android.billingclient:billing-ktx:6.0.1"
     
-    implementation files("libs/billings-2.0.0.aar")
+    implementation files("libs/billings-3.0.0.aar")
 }
 ```
 
@@ -26,8 +26,8 @@ dependencies {
 I used it with ViewModel. **BillingViewModel** holds lifecycle of PlayStore connection and is used to:
 - **launchBillingFlow**
 - call **fetchProductDetails** and store these results into **BillingRepository**
-- **disburse consumable entitlements (consumable skus)**
-- **BillingRepository** is use to store sku details and purchases (permanent purchases and subscriptions)
+- **disburse consumable entitlements (consumable productIds)**
+- **BillingRepository** is use to store product details and purchases (permanent purchases and subscriptions)
 
 **BillingViewModel**
 ```kotlin
@@ -47,9 +47,9 @@ class BillingViewModel(
         billingManager.closePlayStoreConnection()
     }
 
-    fun launchBillingFlow(activity: Activity, sku: String) {
+    fun launchBillingFlow(activity: Activity, productId: String) {
         viewModelScope.launch {
-            billingManager.launchBillingFlow(activity, sku)
+            billingManager.launchBillingFlow(activity, productId)
         }
     }
 
@@ -57,24 +57,24 @@ class BillingViewModel(
         viewModelScope.launch {
             billingManager.fetchProductDetails(
                 setOf(
-                    AppSkuProvider.GOLD_MONTHLY
+                    AppProductIdProvider.GOLD_MONTHLY
                 ),
-                BillingClient.SkuType.SUBS
+                BillingClient.ProductType.SUBS
             )
             billingManager.fetchProductDetails(
                 setOf(
-                    AppSkuProvider.PREMIUM_CAR,
-                    AppSkuProvider.GAS,
+                    AppProductIdProvider.PREMIUM_CAR,
+                    AppProductIdProvider.GAS,
                 ),
-                BillingClient.SkuType.INAPP
+                BillingClient.ProductType.INAPP
             )
             billingManager.fetchPurchases()
         }
     }
 
-    override fun onProductDetailsListChanged(skuDetailsSnippetList: Set<SkuDetailsSnippet>) {
+    override fun onProductDetailsListChanged(productDetailsSnippetList: Set<ProductDetailsSnippet>) {
         viewModelScope.launch {
-            billingRepository.updateSkuDetailsSnippetList(skuDetailsSnippetList.toSet())
+            billingRepository.updateProductDetailsSnippetList(productDetailsSnippetList.toSet())
         }
     }
 
@@ -84,14 +84,14 @@ class BillingViewModel(
         }
     }
 
-    override fun disburseConsumableEntitlements(sku: String, quantity: Int) {
-        Log.d("echo", "disburseConsumableEntitlements: sku=$sku")
+    override fun disburseConsumableEntitlements(productId: String, quantity: Int) {
+        Log.d("echo", "disburseConsumableEntitlements: productId=$productId")
     }
 
-    override fun onPurchaseAcknowledged(sku: String) {
+    override fun onPurchaseAcknowledged(productId: String) {
     }
 
-    override fun onPurchaseConsumed(sku: String) {
+    override fun onPurchaseConsumed(productId: String) {
     }
 }
 ```
@@ -99,10 +99,10 @@ class BillingViewModel(
 **BillingRepository**
 ```kotlin
 interface BillingRepository {
-    val skuDetailsSnippetList: StateFlow<Set<SkuDetailsSnippet>>
+    val productDetailsSnippetList: StateFlow<Set<ProductDetailsSnippet>>
     val purchasesList: StateFlow<Set<String>>
 
-    suspend fun updateSkuDetailsSnippetList(value: Set<SkuDetailsSnippet>)
+    suspend fun updateProductDetailsSnippetList(value: Set<ProductDetailsSnippet>)
 
     suspend fun updatePurchasesList(value: Set<String>)
 }
@@ -111,15 +111,15 @@ interface BillingRepository {
 **BillingRepositoryImpl**
 ```kotlin
 class BillingRepositoryImpl : BillingRepository {
-    private val _skuDetailsSnippetList = MutableStateFlow<Set<SkuDetailsSnippet>>(emptySet())
-    override val skuDetailsSnippetList: StateFlow<Set<SkuDetailsSnippet>>
-        get() = _skuDetailsSnippetList
+    private val _productDetailsSnippetList = MutableStateFlow<Set<ProductDetailsSnippet>(emptySet())
+    override val productDetailsSnippetList: StateFlow<Set<ProductDetailsSnippet>>
+        get() = _productDetailsSnippetList
     private val _purchasesList = MutableStateFlow<Set<String>>(emptySet())
     override val purchasesList: StateFlow<Set<String>>
         get() = _purchasesList
 
-    override suspend fun updateSkuDetailsSnippetList(value: Set<SkuDetailsSnippet>) {
-        _skuDetailsSnippetList.emit(value)
+    override suspend fun updateProductDetailsSnippetList(value: Set<ProductDetailsSnippet>) {
+        _productDetailsSnippetList.emit(value)
     }
 
     override suspend fun updatePurchasesList(value: Set<String>) {
@@ -131,7 +131,7 @@ class BillingRepositoryImpl : BillingRepository {
 **DI (Koin)**
 ```kotlin
 val billingModule = module {
-    single<SkuProvider> { AppSkuProvider() }
+    single<ProductIdProvider> { AppProductIdProvider() }
     single<KeyProvider> { NativeKeyProvider() }
     single<PurchaseValidator> { DefaultPurchaseValidator(get()) }
     single { PlayStoreDataSource(androidApplication(), get(), get()) }
@@ -144,24 +144,24 @@ val billingModule = module {
     viewModel { BillingViewModel(get(), get()) }
 }
 
-private fun provideFakeBillingManager(skuProvider: SkuProvider): BillingManager {
-    val impl = FakeBillingManager(skuProvider)
+private fun provideFakeBillingManager(productIdProvider: ProductIdProvider): BillingManager {
+    val impl = FakeBillingManager(productIdProvider)
     impl.addProductDetails(
         createFakeProductDetails(
-            AppSkuProvider.GOLD_MONTHLY,
-            BillingClient.SkuType.SUBS
+            AppProductIdProvider.GOLD_MONTHLY,
+            BillingClient.ProductType.SUBS
         )
     )
     impl.addProductDetails(
         createFakeProductDetails(
-            AppSkuProvider.PREMIUM_CAR,
-            BillingClient.SkuType.INAPP
+            AppProductIdProvider.PREMIUM_CAR,
+            BillingClient.ProductType.INAPP
         )
     )
     impl.addProductDetails(
         createFakeProductDetails(
-            AppSkuProvider.GAS,
-            BillingClient.SkuType.INAPP
+            AppProductIdProvider.GAS,
+            BillingClient.ProductType.INAPP
         )
     )
     return impl
@@ -185,9 +185,9 @@ class MainActivity : AppCompatActivity() {
 }
 ```
 
-To test flow application without real billing implementation you cal create fake implementation of:
-- **SkuProvider** // holds all skus used in the application
-- **KeyProvider** // provide livence key from the Play Developer Console
+To test flow application without real billing implementation you can create fake implementation of:
+- **ProductIdProvider** // holds all product ids used in the application
+- **KeyProvider** // provide licence key from the Play Developer Console
 - **PurchaseValidator** // purchase validation
-- **BillingRepository** // store of sku details and purchases
+- **BillingRepository** // store of product details and purchases
 - **BillingManager**, // main engine :-)

@@ -19,3 +19,7 @@
 2.0.0
 - [API change] migrate to Play Billing Library v4
 - [NEW] apply quantity feature
+
+3.0.0
+- [API change] migrate to Play Billing Library v6
+- [BREAKING CHANGE] sku -> product
