@@ -2,7 +2,7 @@
 
 buildscript {
     ext.kotlin_version = '1.9.20'
-    ext.kotlinx_coroutines_version = '1.6.4'
+    ext.kotlinx_coroutines_version = '1.7.3'
     repositories {
         google()
         mavenCentral()
