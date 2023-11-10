@@ -14,8 +14,8 @@ module/libs (ex. app/libs)
 and adding the aar dependency to your `build.gradle` file:
 ```groovy
 dependencies {
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4"
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
     implementation "com.android.billingclient:billing-ktx:6.0.1"
     
     implementation files("libs/billings-3.0.0.aar")
