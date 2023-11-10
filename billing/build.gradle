@@ -10,23 +10,11 @@ android {
     defaultConfig {
         minSdkVersion 23
         targetSdkVersion 33
-        versionCode = 1
-        versionName "3.0.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
 
-        project.archivesBaseName = "billing"
-        project.version = android.defaultConfig.versionName
-    }
-    libraryVariants.all { variant ->
-        variant.outputs.all { output ->
-            def outputFile = output.outputFile
-            if (outputFile != null && outputFile.name.endsWith('.aar')) {
-                def fileName = "${archivesBaseName}-${version}.aar"
-                outputFileName = fileName
-            }
-        }
+        project.archivesBaseName = "billing-3.0.0"
     }
     buildTypes {
         release {
