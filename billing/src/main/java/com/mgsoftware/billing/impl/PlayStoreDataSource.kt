@@ -2,15 +2,15 @@ package com.mgsoftware.billing.impl
 
 import android.app.Activity
 import android.app.Application
-import android.util.Log
 import com.android.billingclient.api.*
-import com.mgsoftware.billing.BuildConfig
+import com.android.billingclient.api.BillingClient.ProductType
 import com.mgsoftware.billing.PurchaseValidator
 import com.mgsoftware.billing.ProductIdProvider
 import com.mgsoftware.billing.common.BaseObservable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 
 class PlayStoreDataSource(
     application: Application,
@@ -47,6 +47,7 @@ class PlayStoreDataSource(
                 purchaseChannel.trySend(PurchaseResult(billingResult, purchases.orEmpty()))
             }
             .build()
+
     }
 
     override fun onBillingSetupFinished(billingResult: BillingResult) {
@@ -62,27 +63,21 @@ class PlayStoreDataSource(
     }
 
     override fun onBillingServiceDisconnected() {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "onBillingServiceDisconnected")
-        }
-
+        Timber.d("onBillingServiceDisconnected")
         openConnection()
     }
 
     fun openConnection() {
-        if (!billingClient.isReady)
+        if (!billingClient.isReady) {
+            Timber.d("openConnection")
             billingClient.startConnection(this)
-
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "openConnection")
         }
     }
 
     fun closeConnection() {
-        billingClient.endConnection()
-
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "closeConnection")
+        if (billingClient.isReady) {
+            Timber.d("closeConnection")
+            billingClient.endConnection()
         }
     }
 
@@ -90,7 +85,7 @@ class PlayStoreDataSource(
 
     suspend fun queryProductDetails(
         productId: String,
-        @BillingClient.ProductType productType: String
+        @ProductType productType: String
     ): ProductDetailsResult {
         val productIds = setOf(productId)
         return queryProductDetails(productIds, productType)
@@ -98,12 +93,9 @@ class PlayStoreDataSource(
 
     suspend fun queryProductDetails(
         productIds: Set<String>,
-        @BillingClient.ProductType productType: String
+        @ProductType productType: String
     ): ProductDetailsResult {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "queryProductDetails: productIds=$productIds")
-        }
-
+        Timber.d("queryProductDetails: productIds=$productIds")
         return withContext(Dispatchers.IO) {
             val params = prepareQueryProductDetailsParams(
                 productIds,
@@ -115,7 +107,7 @@ class PlayStoreDataSource(
 
     private fun prepareQueryProductDetailsParams(
         productIds: Set<String>,
-        @BillingClient.ProductType productType: String
+        @ProductType productType: String
     ) = QueryProductDetailsParams
         .newBuilder()
         .setProductList(
@@ -134,68 +126,78 @@ class PlayStoreDataSource(
      * disburseNonConsumableEntitlements
      */
     suspend fun queryPurchasesAsync() = withContext(Dispatchers.IO) {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "queryPurchasesAsync")
-        }
+        Timber.d("queryPurchasesAsync")
+        val purchases = mutableSetOf<Purchase>()
 
-        val purchasesList = mutableSetOf<Purchase>()
-        val params = QueryPurchasesParams.newBuilder()
-        params.setProductType(BillingClient.ProductType.INAPP)
-        val inappResult = billingClient.queryPurchasesAsync(params.build())
+        val params = prepareQueryPurchaseParams(ProductType.INAPP)
+        val inappResult = billingClient.queryPurchasesAsync(params)
+        Timber.d("queryPurchasesAsync (INAPP): ${inappResult.billingResult}")
+        purchases.addAll(inappResult.purchasesList)
 
-        purchasesList.addAll(inappResult.purchasesList)
         if (isSubscriptionSupported()) {
-            val subsResult = billingClient.queryPurchasesAsync(
-                QueryPurchasesParams.newBuilder()
-                    .setProductType(BillingClient.ProductType.SUBS)
-                    .build()
-            )
-            purchasesList.addAll(subsResult.purchasesList)
+            val params = prepareQueryPurchaseParams(ProductType.SUBS)
+            val subsResult = billingClient.queryPurchasesAsync(params)
+            Timber.d("queryPurchasesAsync (SUBS): ${subsResult.billingResult}")
+            purchases.addAll(subsResult.purchasesList)
         }
-        if (purchasesList.isNotEmpty()) {
-            if (BuildConfig.DEBUG) {
-                Log.d(TAG, "Purchases to be processed: $purchasesList")
-            }
 
-            processPurchases(purchasesList, false)
+        if (purchases.isNotEmpty()) {
+            Timber.d("Purchases to be processed: $purchases")
+            processPurchases(
+                purchases = purchases,
+                callFromOnPurchasesUpdated = false
+            )
         } else {
-            if (BuildConfig.DEBUG) {
-                Log.d(TAG, "There are no purchases.")
-            }
-
+            Timber.d("There are no purchases to be process.")
             getListeners().forEach { it.disburseNonConsumableEntitlements(emptySet(), false) }
         }
     }
 
-    suspend fun launchBillingFlow(activity: Activity, productDetails: ProductDetails) {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "launchBillingFlow: ${productDetails.productId}")
-        }
+    private fun prepareQueryPurchaseParams(@ProductType productType: String) = QueryPurchasesParams
+        .newBuilder()
+        .setProductType(productType)
+        .build()
 
-        val params = BillingFlowParams.newBuilder()
-        val productDetailsParamsList =
-            listOf(
-                BillingFlowParams.ProductDetailsParams.newBuilder()
-                    .setProductDetails(productDetails)
-                    .build()
-            )
-        params.setProductDetailsParamsList(productDetailsParamsList)
-        billingClient.launchBillingFlow(activity, params.build())
+    private fun isSubscriptionSupported(): Boolean {
+        val billingResult =
+            billingClient.isFeatureSupported(BillingClient.FeatureType.SUBSCRIPTIONS)
+        Timber.d("isSubscriptionSupported: $billingResult")
+        return when (billingResult.responseCode) {
+            BillingClient.BillingResponseCode.OK -> {
+                true
+            }
+
+            BillingClient.BillingResponseCode.SERVICE_DISCONNECTED -> {
+                openConnection()
+                false
+            }
+
+            else -> {
+                false
+            }
+        }
+    }
+
+    suspend fun launchBillingFlow(
+        activity: Activity,
+        productDetails: ProductDetails
+    ) {
+        Timber.d("launchBillingFlow: " + productDetails.productId)
+
+        val params = prepareBillingFlowParams(productDetails)
+        billingClient.launchBillingFlow(activity, params)
         val result = purchaseChannel.receive()
+        Timber.d("onPurchasesUpdated: ${result.billingResult}")
 
-        val responseCode = result.billingResult.responseCode
-        if (BuildConfig.DEBUG) {
-            val message =
-                billingResponseCodeMessage(responseCode) ?: result.billingResult.debugMessage
-            Log.d(TAG, "onPurchasesUpdated: $message")
-        }
-
-        when (responseCode) {
+        when (result.billingResult.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
                 if (result.purchases.isEmpty()) {
-                    Log.d(TAG, "Empty Purchase List Returned from OK response!")
+                    Timber.d("Empty Purchase List Returned from OK response!")
                 } else {
-                    processPurchases(result.purchases.toSet(), true)
+                    processPurchases(
+                        purchases = result.purchases.toSet(),
+                        callFromOnPurchasesUpdated = true
+                    )
                 }
             }
 
@@ -209,136 +211,35 @@ class PlayStoreDataSource(
         }
     }
 
-    /**
-     * https://developer.android.com/reference/com/android/billingclient/api/BillingClient.BillingResponseCode
-     */
-    private fun billingResponseCodeMessage(@BillingClient.BillingResponseCode responseCode: Int): String? {
-        return when (responseCode) {
-            BillingClient.BillingResponseCode.BILLING_UNAVAILABLE -> {
-                """
-                    A user billing error occurred during processing.
+    private fun prepareBillingFlowParams(productDetails: ProductDetails) =
+        BillingFlowParams.newBuilder()
+            .setProductDetailsParamsList(listOf(prepareProductDetailsParams(productDetails)))
+            .build()
 
-                    Examples where this error may occur:
+    private fun prepareProductDetailsParams(productDetails: ProductDetails): BillingFlowParams.ProductDetailsParams {
+        val builder = BillingFlowParams.ProductDetailsParams.newBuilder()
+        builder.setProductDetails(productDetails)
 
-                    The Play Store app on the user's device is out of date.
-                    The user is in an unsupported country.
-                    The user is an enterprise user and their enterprise admin has disabled users from making purchases.
-                    Google Play is unable to charge the user’s payment method.
-                    Letting the user retry may succeed if the condition causing the error has changed (e.g. An enterprise user's admin has allowed purchases for the organization).
-                """.trimIndent()
-            }
-
-            BillingClient.BillingResponseCode.DEVELOPER_ERROR -> {
-                """
-                    Error resulting from incorrect usage of the API.
-
-                    Examples where this error may occur:
-
-                    Invalid arguments such as providing an empty product list where required.
-                    Misconfiguration of the app such as not signing the app or not having the necessary permissions in the manifest.
-                """.trimIndent()
-            }
-
-            BillingClient.BillingResponseCode.ERROR -> {
-                """
-                    Fatal error during the API action.
-
-                    This is an internal Google Play error that may be transient or due to an unexpected condition during processing. You can automatically retry (e.g. with exponential back off) for this case and contact Google Play if issues persist. Be mindful of how long you retry if the retry is happening during a user interaction.
-                """.trimIndent()
-            }
-
-            BillingClient.BillingResponseCode.FEATURE_NOT_SUPPORTED -> {
-                """
-                    The requested feature is not supported by the Play Store on the current device.
-
-                    If your app would like to check if a feature is supported before trying to use the feature your app can call BillingClient.isFeatureSupported(String) to check if a feature is supported. For a list of feature types that can be supported, see BillingClient.FeatureType.
-
-                    For example: Before calling BillingClient.showInAppMessages(Activity, InAppMessageParams, InAppMessageResponseListener) API, you can call BillingClient.isFeatureSupported(String) with the BillingClient.FeatureType.IN_APP_MESSAGING featureType to check if it is supported.
-                """.trimIndent()
-            }
-
-            BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> {
-                """
-                    The purchase failed because the item is already owned.
-
-                    Make sure your app is up-to-date with recent purchases using guidance in the Fetching purchases section in the integration guide. If this error occurs despite making the check for recent purchases, then it may be due to stale purchase information that was cached on the device by Play. When you receive this error, the cache should get updated. After this, your purchases should be reconciled, and you can process them as outlined in the processing purchases section in the integration guide.
-                """.trimIndent()
-            }
-
-            BillingClient.BillingResponseCode.ITEM_NOT_OWNED -> {
-                """
-                    Requested action on the item failed since it is not owned by the user.
-
-                    Make sure your app is up-to-date with recent purchases using guidance in the Fetching purchases section in the integration guide. If this error occurs despite making the check for recent purchases, then it may be due to stale purchase information cached on the device by Play. When you receive this error, the cache should get updated. After this, your purchases should be reconciled, and you can process the purchases accordingly. For example, if you are trying to consume an item and if the updated purchase information says it is already consumed, you can ignore the error now.
-                """.trimIndent()
-            }
-
-            BillingClient.BillingResponseCode.ITEM_UNAVAILABLE -> {
-                """
-                    The requested product is not available for purchase.
-
-                    Please ensure the product is available in the user’s country. If you recently changed the country availability and are still receiving this error then it may be because of a propagation delay.
-                """.trimIndent()
-            }
-
-            BillingClient.BillingResponseCode.NETWORK_ERROR -> {
-                """
-                    A network error occurred during the operation.
-
-                    This error indicates that there was a problem with the network connection between the device and Play systems. This could potentially also be due to the user not having an active network connection.
-                """.trimIndent()
-            }
-
-            BillingClient.BillingResponseCode.OK -> {
-                """
-                    Success.
-                """.trimIndent()
-            }
-
-            BillingClient.BillingResponseCode.SERVICE_DISCONNECTED -> {
-                """
-                    The app is not connected to the Play Store service via the Google Play Billing Library.
-
-                    Examples where this error may occur:
-
-                    The Play Store could have been updated in the background while your app was still running and the library lost connection.
-                    BillingClient.startConnection(BillingClientStateListener) was never called or has not completed yet.
-                    Since this state is transient, your app should automatically retry (e.g. with exponential back off) to recover from this error. Be mindful of how long you retry if the retry is happening during a user interaction. The retry should lead to a call to BillingClient.startConnection(BillingClientStateListener) right after or in some time after you received this code.
-                """.trimIndent()
-            }
-
-            BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE -> {
-                """
-                    The service is currently unavailable.
-
-                    Since this state is transient, your app should automatically retry (e.g. with exponential back off) to recover from this error. Be mindful of how long you retry if the retry is happening during a user interaction.
-                """.trimIndent()
-            }
-
-            BillingClient.BillingResponseCode.USER_CANCELED -> {
-                """
-                    Transaction was canceled by the user.
-                """.trimIndent()
-            }
-
-            else -> null
+        val subscriptionOfferDetails = productDetails.subscriptionOfferDetails
+        if (subscriptionOfferDetails != null) {
+            builder.setOfferToken(subscriptionOfferDetails.first().offerToken)
         }
+
+        return builder.build()
     }
 
     private suspend fun processPurchases(
         purchases: Set<Purchase>,
         callFromOnPurchasesUpdated: Boolean
     ) {
-        if (BuildConfig.DEBUG) {
-            Log.d(
-                TAG,
-                "processPurchases: ${
-                    purchases.joinToString(
-                        separator = ", ",
-                        transform = { it.products[0] })
-                }"
-            )
-        }
+        Timber.d(
+            "processPurchases: ${
+                purchases.joinToString(
+                    separator = ", ",
+                    transform = { it.defaultProduct() }
+                )
+            }"
+        )
 
         val validPurchases = purchases.filter { purchase ->
             if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED)
@@ -347,84 +248,67 @@ class PlayStoreDataSource(
                 false
         }
 
-        val (consumables, nonConsumables) = validPurchases.partition {
+        val (consumables, nonConsumables) = validPurchases.partition { purchase ->
             val consumableProductIds = productIdProvider.getConsumableProductIds()
-            consumableProductIds.contains(it.products[0])
+            consumableProductIds.contains(purchase.defaultProduct())
         }
         if (consumables.isNotEmpty()) {
-            if (BuildConfig.DEBUG) {
-                Log.d(TAG, "Number of purchases to be consumed: ${consumables.size}")
-            }
-
+            Timber.d("Number of purchases to be consumed: " + consumables.size)
             processConsumablePurchases(consumables)
         }
         if (nonConsumables.isNotEmpty()) {
             val purchasesToBeAcknowledge = nonConsumables.filter { !it.isAcknowledged }
-            Log.d(TAG, "Number of purchases to be acknowledge: ${purchasesToBeAcknowledge.size}")
+            Timber.d("Number of purchases to be acknowledge: " + purchasesToBeAcknowledge.size)
             processNonConsumablePurchases(nonConsumables, callFromOnPurchasesUpdated)
         }
     }
 
-    private suspend fun processConsumablePurchases(purchases: List<Purchase>) {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "processConsumablePurchases")
-        }
+    private fun isSignatureValid(purchase: Purchase): Boolean {
+        return purchaseValidator.verifyPurchase(purchase)
+    }
 
+    private suspend fun processConsumablePurchases(purchases: List<Purchase>) {
+        Timber.d("processConsumablePurchases")
         purchases.forEach { purchase ->
             consumePurchase(purchase)
         }
     }
 
     private suspend fun consumePurchase(purchase: Purchase) {
-        if (purchaseConsumptionInProcess.contains(purchase))
+        if (purchaseConsumptionInProcess.contains(purchase)) {
             return
-
+        }
         purchaseConsumptionInProcess.add(purchase)
-        val params = ConsumeParams.newBuilder()
-        params.setPurchaseToken(purchase.purchaseToken)
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "consumePurchase: ${purchase.products[0]}")
-        }
+        Timber.d("consumePurchase: ${purchase.defaultProduct()}")
 
-        val (billingResult, purchaseToken) = withContext(Dispatchers.IO) {
-            billingClient.consumePurchase(params.build())
+        val params = prepareConsumeParams(purchase.purchaseToken)
+        val (billingResult, _) = withContext(Dispatchers.IO) {
+            billingClient.consumePurchase(params)
         }
+        Timber.d("consumePurchase (${purchase.defaultProduct()}): $billingResult")
         purchaseConsumptionInProcess.remove(purchase)
 
         when (billingResult.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "consumeResult: success")
-                }
-
                 getListeners().forEach {
                     it.onPurchaseConsumed(
-                        purchase.products[0],
+                        purchase.defaultProduct(),
                         purchase.quantity
                     )
                 }
             }
-
-            else -> {
-                if (BuildConfig.DEBUG)
-                    Log.d(
-                        TAG,
-                        "consumeResult: error: responseCode=${billingResult.responseCode} => debugMessage=${billingResult.debugMessage}"
-                    )
-
-                Log.w(TAG, billingResult.debugMessage)
-            }
         }
     }
+
+    private fun prepareConsumeParams(purchaseToken: String) = ConsumeParams.newBuilder()
+        .setPurchaseToken(purchaseToken)
+        .build()
 
     private suspend fun processNonConsumablePurchases(
         purchases: List<Purchase>,
         callFromOnPurchasesUpdated: Boolean
     ) {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "processNonConsumablePurchases")
-        }
-
+        Timber.d("processNonConsumablePurchases")
         val acknowledgedPurchases = purchases.filterTo(mutableSetOf()) { purchase ->
             if (!purchase.isAcknowledged) {
                 acknowledgePurchase(purchase)
@@ -441,57 +325,39 @@ class PlayStoreDataSource(
     }
 
     private suspend fun acknowledgePurchase(purchase: Purchase): Boolean {
-        val params = AcknowledgePurchaseParams.newBuilder()
-        params.setPurchaseToken(purchase.purchaseToken)
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "acknowledgePurchase: ${purchase.products[0]}")
-        }
+        Timber.d("acknowledgePurchase: ${purchase.defaultProduct()}")
 
-        val billingResult = billingClient.acknowledgePurchase(params.build())
+        val params = prepareAcknowledgePurchaseParams(purchase.purchaseToken)
+        val billingResult = withContext(Dispatchers.IO) {
+            billingClient.acknowledgePurchase(params)
+        }
+        Timber.d("acknowledgePurchase: (${purchase.defaultProduct()}): $billingResult")
         return when (billingResult.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
-                Log.d(TAG, "acknowledgeResult success")
-                getListeners().forEach { it.onPurchaseAcknowledged(purchase.products[0]) }
+                getListeners().forEach { it.onPurchaseAcknowledged(purchase.defaultProduct()) }
                 true
             }
 
             else -> {
-                Log.w(
-                    TAG,
-                    "acknowledgeResult error: responseCode=${billingResult.responseCode} => debugMessage=${billingResult.debugMessage}"
-                )
                 false
             }
         }
     }
 
-    private fun isSignatureValid(purchase: Purchase): Boolean {
-        return purchaseValidator.verifyPurchase(purchase)
-    }
+    private fun prepareAcknowledgePurchaseParams(purchaseToken: String) =
+        AcknowledgePurchaseParams.newBuilder()
+            .setPurchaseToken(purchaseToken)
+            .build()
 
-    private fun isSubscriptionSupported(): Boolean {
-        val billingResult =
-            billingClient.isFeatureSupported(BillingClient.FeatureType.SUBSCRIPTIONS)
-        return when (billingResult.responseCode) {
-            BillingClient.BillingResponseCode.OK -> {
-                true
-            }
 
-            BillingClient.BillingResponseCode.SERVICE_DISCONNECTED -> {
-                openConnection()
-                false
-            }
-
-            else -> {
-                Log.w(TAG, "isSubscriptionSupported() error: ${billingResult.debugMessage}")
-                false
-            }
-        }
-    }
+    /**
+     * return first product of purchase. Library does not handle multi product purchases.
+     */
+    private fun Purchase.defaultProduct() = products.first()
 
     data class PurchaseResult(val billingResult: BillingResult, val purchases: List<Purchase>)
 
     companion object {
-        private val TAG = PlayStoreDataSource::class.java.simpleName
+        private const val DEFAULT_INDEX = 0
     }
 }
