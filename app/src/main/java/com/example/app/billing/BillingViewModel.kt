@@ -1,74 +1,42 @@
 package com.example.app.billing
 
 import android.app.Activity
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.android.billingclient.api.BillingClient
-import com.mgsoftware.billing.BillingManager
-import com.mgsoftware.billing.ProductDetailsSnippet
+import com.google.firebase.crashlytics.ktx.crashlytics
+import com.google.firebase.ktx.Firebase
+import com.mgsoftware.billing.api.BillingManager
 import kotlinx.coroutines.launch
 
 class BillingViewModel(
-    private val billingManager: BillingManager,
-    private val billingRepository: BillingRepository
-) : ViewModel(), BillingManager.Listener {
+    private val billingManager: BillingManager
+) : ViewModel() {
 
     init {
-        billingManager.registerListener(this)
-        billingManager.openPlayStoreConnection()
+        billingManager.openConnection()
+
+        viewModelScope.launch {
+            billingManager.connectionState().collect {
+                Firebase.crashlytics.log("BillingConnectionState=$it")
+            }
+        }
     }
 
     override fun onCleared() {
-        super.onCleared()
-        billingManager.unregisterListener(this)
-        billingManager.closePlayStoreConnection()
+        billingManager.closeConnection()
+        billingManager.dispose()
     }
 
-    fun launchBillingFlow(activity: Activity, productId: String) {
-        viewModelScope.launch {
-            billingManager.launchBillingFlow(activity, productId)
-        }
-    }
+    fun openConnection() = billingManager.openConnection()
 
-    override fun onBillingClientReady() {
-        viewModelScope.launch {
-            billingManager.fetchProductDetails(
-                setOf(
-                    AppProductIdProvider.GOLD_MONTHLY
-                ),
-                BillingClient.ProductType.SUBS
-            )
-            billingManager.fetchProductDetails(
-                setOf(
-                    AppProductIdProvider.PREMIUM_CAR,
-                    AppProductIdProvider.GAS,
-                ),
-                BillingClient.ProductType.INAPP
-            )
-            billingManager.fetchPurchases()
-        }
-    }
+    fun closeConnection() = billingManager.closeConnection()
 
-    override fun onProductDetailsListChanged(productDetailsSnippetList: Set<ProductDetailsSnippet>) {
-        viewModelScope.launch {
-            billingRepository.updateProductDetailsSnippetList(productDetailsSnippetList.toSet())
-        }
-    }
+    fun fetchPurchases() = billingManager.fetchProducts()
 
-    override fun onPurchasesListChanged(purchasesList: Set<String>) {
-        viewModelScope.launch {
-            billingRepository.updatePurchasesList(purchasesList.toSet())
-        }
-    }
-
-    override fun disburseConsumableEntitlements(productId: String, quantity: Int) {
-        Log.d("echo", "disburseConsumableEntitlements: productId=$productId")
-    }
-
-    override fun onPurchaseAcknowledged(productId: String) {
-    }
-
-    override fun onPurchaseConsumed(productId: String) {
+    fun launchBillingFlow(
+        activity: Activity,
+        productId: String,
+    ) = viewModelScope.launch {
+        billingManager.launchBillingFlow(activity, productId)
     }
 }

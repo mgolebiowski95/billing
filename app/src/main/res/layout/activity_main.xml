@@ -1,9 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layout>
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-        android:id="@+id/my_content"
+    <LinearLayout
+        android:id="@+id/column"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <Button
+            android:id="@+id/open_connection_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="open connection" />
+
+        <Button
+            android:id="@+id/close_connection_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="close connection" />
+
+        <FrameLayout
+            android:id="@+id/product_list_container"
+            android:layout_width="match_parent"
+            android:layout_weight="1"
+            android:layout_height="0dp"/>
+
+    </LinearLayout>
 
 </layout>

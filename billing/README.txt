@@ -23,3 +23,8 @@
 3.0.0
 - [API change] migrate to Play Billing Library v6
 - [BREAKING CHANGE] sku -> product
+
+6.2.0
+- [BREAKING CHANGE] entire library redesign
+- [NEW] update to Play Billing Library v6.2.0
+- [NEW] version naming depends on used Play Billing Library version

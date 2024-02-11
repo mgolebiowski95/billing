@@ -1,29 +1,44 @@
-package com.mgsoftware.billing.impl
+package com.mgsoftware.billing.api.validation
 
 import android.text.TextUtils
 import android.util.Base64
-import android.util.Log
 import com.android.billingclient.api.Purchase
-import com.mgsoftware.billing.KeyProvider
-import com.mgsoftware.billing.PurchaseValidator
+import com.mgsoftware.billing.api.PurchaseValidator
+import com.mgsoftware.billing.api.model.Constants
+import timber.log.Timber
 import java.io.IOException
-import java.security.*
+import java.security.InvalidKeyException
+import java.security.KeyFactory
+import java.security.NoSuchAlgorithmException
+import java.security.PublicKey
+import java.security.Signature
+import java.security.SignatureException
 import java.security.spec.InvalidKeySpecException
 import java.security.spec.X509EncodedKeySpec
 
-class DefaultPurchaseValidator(
+internal class DefaultPurchaseValidator(
     private val keyProvider: KeyProvider
 ) : PurchaseValidator {
 
-    override fun verifyPurchase(purchase: Purchase): Boolean {
-        return internalVerifyPurchase(keyProvider.getLicenceKey(), purchase.originalJson, purchase.signature)
+    override suspend fun verifyPurchase(purchase: Purchase): Boolean {
+        return internalVerifyPurchase(
+            keyProvider.getLicenceKey(),
+            purchase.originalJson,
+            purchase.signature
+        )
     }
 
-    private fun internalVerifyPurchase(base64PublicKey: String, signedData: String, signature: String): Boolean {
-        if ((TextUtils.isEmpty(signedData) || TextUtils.isEmpty(base64PublicKey)
-                    || TextUtils.isEmpty(signature))
+    private fun internalVerifyPurchase(
+        base64PublicKey: String,
+        signedData: String,
+        signature: String
+    ): Boolean {
+        if (
+            TextUtils.isEmpty(signedData) ||
+            TextUtils.isEmpty(base64PublicKey) ||
+            TextUtils.isEmpty(signature)
         ) {
-            Log.w(TAG, "Purchase verification failed: missing data.")
+            Timber.tag(Constants.LIBRARY_TAG).w("Purchase verification failed: missing data.")
             return false
         }
         val key = generatePublicKey(base64PublicKey)
@@ -40,7 +55,7 @@ class DefaultPurchaseValidator(
             throw RuntimeException(e)
         } catch (e: InvalidKeySpecException) {
             val msg = "Invalid key specification: $e"
-            Log.w(TAG, msg)
+            Timber.tag(Constants.LIBRARY_TAG).w(msg)
             throw IOException(msg)
         }
     }
@@ -50,7 +65,7 @@ class DefaultPurchaseValidator(
         try {
             signatureBytes = Base64.decode(signature, Base64.DEFAULT)
         } catch (e: IllegalArgumentException) {
-            Log.w(TAG, "Base64 decoding failed.")
+            Timber.tag(Constants.LIBRARY_TAG).w("Base64 decoding failed.")
             return false
         }
         try {
@@ -58,7 +73,7 @@ class DefaultPurchaseValidator(
             signatureAlgorithm.initVerify(publicKey)
             signatureAlgorithm.update(signedData.toByteArray())
             if (!signatureAlgorithm.verify(signatureBytes)) {
-                Log.w(TAG, "Signature verification failed...")
+                Timber.tag(Constants.LIBRARY_TAG).w("Signature verification failed...")
                 return false
             }
             return true
@@ -66,15 +81,14 @@ class DefaultPurchaseValidator(
             // "RSA" is guaranteed to be available.
             throw RuntimeException(e)
         } catch (e: InvalidKeyException) {
-            Log.w(TAG, "Invalid key specification.")
+            Timber.tag(Constants.LIBRARY_TAG).w("Invalid key specification.")
         } catch (e: SignatureException) {
-            Log.w(TAG, "Signature exception.")
+            Timber.tag(Constants.LIBRARY_TAG).w("Signature exception.")
         }
         return false
     }
 
     companion object {
-        private const val TAG = "PurchaseValidatorImpl"
         private const val KEY_FACTORY_ALGORITHM = "RSA"
         private const val SIGNATURE_ALGORITHM = "SHA1withRSA"
     }

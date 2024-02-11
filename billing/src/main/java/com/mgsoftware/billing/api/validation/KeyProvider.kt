@@ -1,4 +1,4 @@
-package com.mgsoftware.billing
+package com.mgsoftware.billing.api.validation
 
 interface KeyProvider {
 

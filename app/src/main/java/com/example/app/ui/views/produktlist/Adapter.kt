@@ -24,4 +24,12 @@ class Adapter(
             onItemClick(currentList[it])
         }
     }
+
+    override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean {
+        return oldItem.productId == newItem.productId
+    }
+
+    override fun areContentsTheSame(oldItem: Item, newItem: Item): Boolean {
+        return oldItem == newItem
+    }
 }

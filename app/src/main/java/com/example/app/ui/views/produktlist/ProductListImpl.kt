@@ -12,7 +12,6 @@ class ProductListImpl(
     inflater: LayoutInflater,
     parent: ViewGroup?,
     values: Values,
-    onItemClick: (item: Item) -> Unit
 ) : BaseObservableView<ProductList.Listener>(), ProductList {
     private val binding = LayoutProductListBinding.inflate(inflater, parent, false)
 
@@ -26,7 +25,9 @@ class ProductListImpl(
 
         adapter = Adapter(
             values,
-            onItemClick = onItemClick
+            onItemClick = { item ->
+                getListeners().forEach { it.onItemClick(item) }
+            }
         )
         binding.recyclerView.adapter = adapter
     }
