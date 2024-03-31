@@ -98,9 +98,10 @@ class FakeBillingManager(
     override fun getProductInfo(productId: String): Flow<ProductInfo> {
         return combine(
             productDetails.mapNotNull { it.find { it.productId == productId } },
+            isPurchasedMap.getOrPut(productId) { MutableStateFlow(false) },
             isPurchasedMap.getOrPut(productId) { MutableStateFlow(false) }
-        ) { productDetails, isPurchased ->
-            ProductInfo(productDetails, !isPurchased)
+        ) { productDetails, isPurchased, canPurchase ->
+            ProductInfo(productDetails, !isPurchased, canPurchase)
         }
     }
 

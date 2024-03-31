@@ -31,7 +31,7 @@ class MainActivityViewModel(
                 billingManager.getProductInfo(AppProductIdProvider.GAS),
                 billingManager.getProductInfo(AppProductIdProvider.PREMIUM_CAR),
             ) { a, b, c ->
-                listOfNotNull(a, b, c)
+                listOf(a, b, c)
             }
                 .distinctUntilChanged()
                 .debounce(1000L)
@@ -40,6 +40,7 @@ class MainActivityViewModel(
                         Item(
                             it.productDetails.productId,
                             it.productDetails.price,
+                            it.isPurchased,
                             it.canPurchase
                         )
                     }

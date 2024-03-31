@@ -2,19 +2,18 @@ package com.mgsoftware.billing.internal.connection
 
 import android.content.Context
 import com.android.billingclient.api.BillingClient
-import com.android.billingclient.api.BillingClientStateListener
-import com.android.billingclient.api.BillingResult
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.mgsoftware.billing.api.model.ConnectionState
 import com.mgsoftware.billing.api.model.ConnectionStateMapper
 import com.mgsoftware.billing.api.model.Constants
 import com.mgsoftware.billing.utils.retry
+import com.mgsoftware.billing.utils.startConnection
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import timber.log.Timber
 
-class GooglePlayBillingConnection(
+internal class OldGooglePlayBillingConnection(
     private val context: Context,
     private val purchasesUpdatedListener: PurchasesUpdatedListener
 ) : BillingConnection {
@@ -30,21 +29,6 @@ class GooglePlayBillingConnection(
     override val state: StateFlow<ConnectionState>
         get() = _state
 
-    private val billingClientListener = object : BillingClientStateListener {
-        override fun onBillingServiceDisconnected() {
-            Timber.tag(Constants.LIBRARY_TAG).d("Connection lost.")
-            updateState()
-            onBillingServiceDisconnected?.invoke()
-        }
-
-        override fun onBillingSetupFinished(billingResult: BillingResult) {
-            updateState()
-            if (state.value == ConnectionState.CONNECTED) {
-                Timber.tag(Constants.LIBRARY_TAG).d("Connection established.")
-            }
-        }
-    }
-
     override var onConnectionEstablished: (() -> Unit)? = null
     override var onBillingServiceDisconnected: (() -> Unit)? = null
 
@@ -59,6 +43,12 @@ class GooglePlayBillingConnection(
             establishConnection()
             onConnectionEstablished?.invoke()
         }
+    }
+
+    private fun onBillingServiceDisconnected() {
+        Timber.tag(Constants.LIBRARY_TAG).d("Connection lost.")
+        updateState()
+        onBillingServiceDisconnected?.invoke()
     }
 
     override fun close() {
@@ -79,28 +69,18 @@ class GooglePlayBillingConnection(
     }
 
     private suspend fun establishConnection() = retry(
-        initialDelayBeforeNextAttempt = 250,
-        retries = 4,
         onFailedAttempt = {
-            Timber
-                .tag(Constants.LIBRARY_TAG)
-                .w("A attempt to establish a connection failed caused by $it")
+            Timber.tag(Constants.LIBRARY_TAG).w("A attempt to establish a connection failed caused by $it")
             true
         }
     ) {
-        if (state.value == ConnectionState.CONNECTED) {
-            return@retry
-        }
-
-        if (state.value == ConnectionState.DISCONNECTED) {
-            Timber.tag(Constants.LIBRARY_TAG).d("Establish connection...")
-            billingClient.startConnection(billingClientListener)
-            updateState()
-        }
-
-        if (state.value != ConnectionState.CONNECTED) {
-            throw Exception("Not yet connected.")
-        }
+        Timber.tag(Constants.LIBRARY_TAG).d("Establish connection...")
+        billingClient.startConnection(
+            onStartExecution = ::updateState,
+            onBillingServiceDisconnected = ::onBillingServiceDisconnected
+        )
+        Timber.tag(Constants.LIBRARY_TAG).d("Connection established.")
+        updateState()
     }
 
     private fun updateState() =

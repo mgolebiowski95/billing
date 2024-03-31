@@ -101,7 +101,8 @@ internal class GooglePlayBillingManager(
         scope.launch {
             retry(
                 onFailedAttempt = {
-                    Timber.tag(Constants.LIBRARY_TAG).w("A attempt to fetch product details failed caused by $it")
+                    Timber.tag(Constants.LIBRARY_TAG)
+                        .w("A attempt to fetch product details failed caused by $it")
                     if (it !is BillingException) return@retry false
 
                     when (it.responseCode) {
@@ -135,7 +136,8 @@ internal class GooglePlayBillingManager(
         scope.launch {
             retry(
                 onFailedAttempt = {
-                    Timber.tag(Constants.LIBRARY_TAG).w("A attempt to fetch purchases failed caused by $it")
+                    Timber.tag(Constants.LIBRARY_TAG)
+                        .w("A attempt to fetch purchases failed caused by $it")
                     if (it !is BillingException) return@retry false
 
                     when (it.responseCode) {
@@ -167,7 +169,8 @@ internal class GooglePlayBillingManager(
         scope.launch {
             retry(
                 onFailedAttempt = {
-                    Timber.tag(Constants.LIBRARY_TAG).w("A attempt to launch billing flow failed caused by $it")
+                    Timber.tag(Constants.LIBRARY_TAG)
+                        .w("A attempt to launch billing flow failed caused by $it")
                     if (it !is BillingException) return@retry false
 
                     when (it.responseCode) {
@@ -197,9 +200,10 @@ internal class GooglePlayBillingManager(
 
     override fun getProductInfo(productId: String): Flow<ProductInfo> = combine(
         productDetailsStore.get(productId).filterNotNull(),
-        productsFeature.canPurchase(productId),
-    ) { productDetails, canPurchase ->
-        ProductInfo(productDetails, canPurchase)
+        productsFeature.isPurchased(productId),
+        productsFeature.canPurchase(productId)
+    ) { productDetails, isPurchases, canPurchase ->
+        ProductInfo(productDetails, isPurchases, canPurchase)
     }
 
     override fun dispose() = scope.cancel()

@@ -1,6 +1,8 @@
 package com.example.app.ui.views.produktlist
 
+import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.isVisible
 import com.example.app.R
 import com.example.app.databinding.LayoutProductListItemBinding
 import com.example.app.ui.common.recyclerviewadapter.RecyclerViewHolder
@@ -24,10 +26,14 @@ class ItemViewHolder(
         sb.appendLine("productId=${item.productId}")
         binding.textView.text = sb.toString()
 
-        if (item.canBePurchased)
-            binding.cardView.setCardBackgroundColor(values.getColor(R.color.green_500))
-        else
-            binding.cardView.setCardBackgroundColor(values.getColor(R.color.red_500))
+        val color = when {
+            item.isPurchased -> R.color.white
+            item.canBePurchased -> R.color.white
+            !item.canBePurchased -> R.color.grey_200
+            else -> View.NO_ID
+        }
+        binding.cardView.setCardBackgroundColor(values.getColor(color))
+        binding.checkIcon.isVisible = item.isPurchased
 
         binding.priceLabel.text = item.price
     }

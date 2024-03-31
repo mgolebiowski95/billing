@@ -17,9 +17,10 @@ internal suspend fun <T> retry(
         retry(
             retries = retries,
             predicate = { cause ->
+                val shallRetry = onFailedAttempt(cause)
                 delay(currentDelay)
                 currentDelay = (currentDelay * delayFactor).toLong()
-                onFailedAttempt(cause)
+                shallRetry
             },
             block = block
         )
