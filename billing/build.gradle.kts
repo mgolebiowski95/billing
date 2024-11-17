@@ -16,7 +16,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
 
-        version = "6.2.0"
+        version = "6.2.0.1"
         archivesName.set("billing-$version")
     }
 

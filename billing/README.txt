@@ -28,3 +28,6 @@
 - [BREAKING CHANGE] entire library redesign
 - [NEW] update to Play Billing Library v6.2.0
 - [NEW] version naming depends on used Play Billing Library version
+
+6.2.0.1
+- [FIX] fix crash trying to connect to billing service
