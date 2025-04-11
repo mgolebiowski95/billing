@@ -31,3 +31,6 @@
 
 6.2.0.1
 - [FIX] fix crash trying to connect to billing service
+
+7.1.1.0
+- [API change] migrate to Play Billing Library v7

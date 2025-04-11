@@ -4,6 +4,7 @@ import android.content.Context
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingResult
+import com.android.billingclient.api.PendingPurchasesParams
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.mgsoftware.billing.api.model.ConnectionState
 import com.mgsoftware.billing.api.model.ConnectionStateMapper
@@ -48,11 +49,16 @@ class GooglePlayBillingConnection(
     override var onConnectionEstablished: (() -> Unit)? = null
     override var onBillingServiceDisconnected: (() -> Unit)? = null
 
-    private fun prepareBillingClient() =
-        BillingClient.newBuilder(context)
-            .enablePendingPurchases()
+    private fun prepareBillingClient(): BillingClient {
+        val pendingPurchasesParams = PendingPurchasesParams
+            .newBuilder()
+            .enableOneTimeProducts()
+            .build()
+        return BillingClient.newBuilder(context)
+            .enablePendingPurchases(pendingPurchasesParams)
             .setListener(purchasesUpdatedListener)
             .build()
+    }
 
     override suspend fun open() {
         if (billingClient.connectionState == BillingClient.ConnectionState.DISCONNECTED) {
