@@ -1,5 +1,5 @@
 # billing
-**billing** is a wrapped **play billing library** (current v6.0.0)
+**billing** is a wrapped **play billing library** (current v8.0.0)
 ### WARNING
 ##### !!! Before usage, you need a basic knowledge about and how works Play Billing Library. Write own sample application and try it. !!! Review code and maybe you write better one :-)
 
@@ -14,12 +14,12 @@ module/libs (ex. app/libs)
 and adding the aar dependency to your `build.gradle` file:
 ```groovy
 dependencies { 
-    implementation "com.android.billingclient:billing-ktx:7.1.1"
+    implementation "com.android.billingclient:billing-ktx:8.0.0"
     implementation 'com.jakewharton.timber:timber:5.0.1'
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1"
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1" 
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2" 
     
-    implementation files("libs/billings-3.0.0.aar")
+    implementation files("libs/billings-8.0.0.0.aar")
 }
 ```
 
