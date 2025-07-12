@@ -8,11 +8,8 @@ import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
-import com.android.billingclient.api.SkuDetails
-import com.android.billingclient.api.SkuDetailsParams
 import com.android.billingclient.api.queryProductDetails
 import com.android.billingclient.api.queryPurchasesAsync
-import com.android.billingclient.api.querySkuDetails
 import com.mgsoftware.billing.api.model.BillingException
 import com.mgsoftware.billing.api.model.FeatureType
 import kotlin.coroutines.resume
@@ -43,17 +40,6 @@ internal suspend fun BillingClient.startConnection(
         }
     })
     onStartExecution()
-}
-
-internal suspend fun BillingClient.getSkuDetails(
-    params: SkuDetailsParams
-): List<SkuDetails>? {
-    val (billingResult, skuDetails) = querySkuDetails(params)
-    if (billingResult.responseCode == BillingResponseCode.OK) {
-        return skuDetails
-    } else {
-        throw BillingException(billingResult)
-    }
 }
 
 internal suspend fun BillingClient.getProductDetails(

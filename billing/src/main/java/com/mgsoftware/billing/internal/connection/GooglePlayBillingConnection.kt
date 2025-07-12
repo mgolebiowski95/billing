@@ -50,15 +50,18 @@ class GooglePlayBillingConnection(
     override var onBillingServiceDisconnected: (() -> Unit)? = null
 
     private fun prepareBillingClient(): BillingClient {
-        val pendingPurchasesParams = PendingPurchasesParams
-            .newBuilder()
-            .enableOneTimeProducts()
-            .build()
+        val params = preparePendingPurchasesParams()
         return BillingClient.newBuilder(context)
-            .enablePendingPurchases(pendingPurchasesParams)
+            .enableAutoServiceReconnection()
+            .enablePendingPurchases(params)
             .setListener(purchasesUpdatedListener)
             .build()
     }
+
+    private fun preparePendingPurchasesParams() = PendingPurchasesParams
+        .newBuilder()
+        .enableOneTimeProducts()
+        .build()
 
     override suspend fun open() {
         if (billingClient.connectionState == BillingClient.ConnectionState.DISCONNECTED) {

@@ -12,7 +12,6 @@ import com.mgsoftware.billing.internal.connection.GooglePlayBillingConnection
 import com.mgsoftware.billing.internal.productdetails.ProductDetailsFeature
 import com.mgsoftware.billing.internal.productdetails.ProductDetailsFeatureImpl
 import com.mgsoftware.billing.internal.productdetails.ProductDetailsStore
-import com.mgsoftware.billing.internal.productdetails.SkuDetailsFeatureImpl
 import com.mgsoftware.billing.internal.products.ProductsFeature
 import com.mgsoftware.billing.internal.products.ProductsFeatureImpl
 import com.mgsoftware.billing.utils.isFeatureSupported
@@ -79,7 +78,7 @@ internal class GooglePlayBillingManager(
             if (isFeatureSupported(FeatureType.PRODUCT_DETAILS)) {
                 ProductDetailsFeatureImpl(connection, productIdProvider, productDetailsStore)
             } else {
-                SkuDetailsFeatureImpl(connection, productIdProvider, productDetailsStore)
+                throw UnsupportedOperationException()
             }
         }.also { productDetailsFeature = it }
 
