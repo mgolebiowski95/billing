@@ -34,3 +34,6 @@
 
 7.1.1.0
 - [API change] migrate to Play Billing Library v7
+
+8.0.0.0
+- [API change] migrate to Play Billing Library v8
