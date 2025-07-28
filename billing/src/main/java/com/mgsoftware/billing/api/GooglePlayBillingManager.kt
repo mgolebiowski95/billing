@@ -75,11 +75,12 @@ internal class GooglePlayBillingManager(
 
     private suspend fun prepareProductDetailsFeature(): ProductDetailsFeature =
         if (::productDetailsFeature.isInitialized) productDetailsFeature else connection.useBillingClient {
-            if (isFeatureSupported(FeatureType.PRODUCT_DETAILS)) {
-                ProductDetailsFeatureImpl(connection, productIdProvider, productDetailsStore)
-            } else {
-                throw UnsupportedOperationException()
-            }
+            ProductDetailsFeatureImpl(connection, productIdProvider, productDetailsStore)
+//            if (isFeatureSupported(FeatureType.PRODUCT_DETAILS)) {
+//
+//            } else {
+//                throw UnsupportedOperationException()
+//            }
         }.also { productDetailsFeature = it }
 
     override fun connectionState() = connection.state
