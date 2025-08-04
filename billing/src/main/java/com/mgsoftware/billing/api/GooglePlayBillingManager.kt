@@ -33,7 +33,7 @@ import timber.log.Timber
 
 internal class GooglePlayBillingManager(
     context: Context,
-    private val productIdProvider: ProductIdProvider,
+    productIdProvider: ProductIdProvider,
     purchaseValidator: PurchaseValidator,
     private val productDetailsStore: ProductDetailsStore,
 ) : BillingManager {
@@ -45,7 +45,11 @@ internal class GooglePlayBillingManager(
             productsFeature.onPurchasesUpdated(billingResult, purchases)
         },
     )
-    private lateinit var productDetailsFeature: ProductDetailsFeature
+    private val productDetailsFeature: ProductDetailsFeature = ProductDetailsFeatureImpl(
+        connection,
+        productIdProvider,
+        productDetailsStore
+    )
     private val productsFeature: ProductsFeature = ProductsFeatureImpl(
         connection = connection,
         getProductDetailsFeature = { productDetailsFeature },
@@ -61,8 +65,6 @@ internal class GooglePlayBillingManager(
     init {
         connection.onConnectionEstablished = {
             scope.launch {
-                prepareProductDetailsFeature()
-                fetchProductDetails()
                 fetchProducts()
             }
         }
@@ -72,16 +74,6 @@ internal class GooglePlayBillingManager(
             }
         }
     }
-
-    private suspend fun prepareProductDetailsFeature(): ProductDetailsFeature =
-        if (::productDetailsFeature.isInitialized) productDetailsFeature else connection.useBillingClient {
-            ProductDetailsFeatureImpl(connection, productIdProvider, productDetailsStore)
-//            if (isFeatureSupported(FeatureType.PRODUCT_DETAILS)) {
-//
-//            } else {
-//                throw UnsupportedOperationException()
-//            }
-        }.also { productDetailsFeature = it }
 
     override fun connectionState() = connection.state
 
