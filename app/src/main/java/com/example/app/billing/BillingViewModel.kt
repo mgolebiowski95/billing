@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 class BillingViewModel(
     private val billingManager: BillingManager
 ) : ViewModel() {
+    val connectionState = billingManager.connectionState()
 
     init {
         billingManager.openConnection()

@@ -1,7 +1,12 @@
 package com.example.app.ui
 
 import android.os.Bundle
+import android.view.View
+import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.lifecycleScope
 import com.example.app.R
@@ -12,6 +17,7 @@ import com.example.app.ui.views.produktlist.Item
 import com.example.app.ui.views.produktlist.ProductList
 import com.example.app.ui.views.produktlist.ProductListImpl
 import com.example.app.utility.Values
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.get
@@ -33,6 +39,8 @@ class MainActivity : AppCompatActivity(), ProductList.Listener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
+        binding.root.applyInsets()
+
         productList = ProductListImpl(
             inflater = layoutInflater,
             parent = binding.productListContainer,
@@ -61,6 +69,12 @@ class MainActivity : AppCompatActivity(), ProductList.Listener {
                 billingViewModel.fetchPurchases()
             }
         }
+
+        lifecycleScope.launch {
+            billingViewModel.connectionState.collect {
+                println("echo: $it")
+            }
+        }
     }
 
     override fun onStart() {
@@ -76,5 +90,19 @@ class MainActivity : AppCompatActivity(), ProductList.Listener {
 
     override fun onItemClick(item: Item) {
         billingViewModel.launchBillingFlow(this, item.productId)
+    }
+
+    fun View.applyInsets() {
+        ViewCompat.setOnApplyWindowInsetsListener(this) { v, windowInsets ->
+            val insets =
+                windowInsets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            v.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                leftMargin = insets.left
+                topMargin = insets.top
+                rightMargin = insets.right
+                bottomMargin = insets.bottom
+            }
+            WindowInsetsCompat.CONSUMED
+        }
     }
 }

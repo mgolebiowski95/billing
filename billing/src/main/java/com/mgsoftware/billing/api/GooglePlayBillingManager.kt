@@ -5,7 +5,6 @@ import android.content.Context
 import com.mgsoftware.billing.api.model.BillingException
 import com.mgsoftware.billing.api.model.BillingResponseCode
 import com.mgsoftware.billing.api.model.Constants
-import com.mgsoftware.billing.api.model.FeatureType
 import com.mgsoftware.billing.api.model.ProductInfo
 import com.mgsoftware.billing.internal.connection.BillingConnection
 import com.mgsoftware.billing.internal.connection.GooglePlayBillingConnection
@@ -14,7 +13,6 @@ import com.mgsoftware.billing.internal.productdetails.ProductDetailsFeatureImpl
 import com.mgsoftware.billing.internal.productdetails.ProductDetailsStore
 import com.mgsoftware.billing.internal.products.ProductsFeature
 import com.mgsoftware.billing.internal.products.ProductsFeatureImpl
-import com.mgsoftware.billing.utils.isFeatureSupported
 import com.mgsoftware.billing.utils.retry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,7 +31,7 @@ import timber.log.Timber
 
 internal class GooglePlayBillingManager(
     context: Context,
-    private val productIdProvider: ProductIdProvider,
+    productIdProvider: ProductIdProvider,
     purchaseValidator: PurchaseValidator,
     private val productDetailsStore: ProductDetailsStore,
 ) : BillingManager {
@@ -45,7 +43,11 @@ internal class GooglePlayBillingManager(
             productsFeature.onPurchasesUpdated(billingResult, purchases)
         },
     )
-    private lateinit var productDetailsFeature: ProductDetailsFeature
+    private val productDetailsFeature: ProductDetailsFeature = ProductDetailsFeatureImpl(
+        connection,
+        productIdProvider,
+        productDetailsStore
+    )
     private val productsFeature: ProductsFeature = ProductsFeatureImpl(
         connection = connection,
         getProductDetailsFeature = { productDetailsFeature },
@@ -59,29 +61,12 @@ internal class GooglePlayBillingManager(
         get() = _onBillingError
 
     init {
-        connection.onConnectionEstablished = {
-            scope.launch {
-                prepareProductDetailsFeature()
-                fetchProductDetails()
-                fetchProducts()
-            }
-        }
         connection.onBillingServiceDisconnected = {
             scope.launch {
                 connection.open()
             }
         }
     }
-
-    private suspend fun prepareProductDetailsFeature(): ProductDetailsFeature =
-        if (::productDetailsFeature.isInitialized) productDetailsFeature else connection.useBillingClient {
-            ProductDetailsFeatureImpl(connection, productIdProvider, productDetailsStore)
-//            if (isFeatureSupported(FeatureType.PRODUCT_DETAILS)) {
-//
-//            } else {
-//                throw UnsupportedOperationException()
-//            }
-        }.also { productDetailsFeature = it }
 
     override fun connectionState() = connection.state
 

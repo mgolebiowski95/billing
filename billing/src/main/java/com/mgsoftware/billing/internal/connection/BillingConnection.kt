@@ -6,8 +6,6 @@ import kotlinx.coroutines.flow.StateFlow
 
 internal interface BillingConnection {
     val state: StateFlow<ConnectionState>
-
-    var onConnectionEstablished: (() -> Unit)?
     var onBillingServiceDisconnected: (() -> Unit)?
 
     suspend fun open()
