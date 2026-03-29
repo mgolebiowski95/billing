@@ -2,10 +2,12 @@ package com.example.app.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.android.billingclient.api.BillingClient
 import com.example.app.billing.AppProductIdProvider
 import com.example.app.ui.views.produktlist.Item
 import com.example.app.utility.Values
 import com.mgsoftware.billing.api.BillingManager
+import com.mgsoftware.billing.api.model.ConnectionState
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -17,12 +17,10 @@ import com.example.app.ui.views.produktlist.Item
 import com.example.app.ui.views.produktlist.ProductList
 import com.example.app.ui.views.produktlist.ProductListImpl
 import com.example.app.utility.Values
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.get
 import org.koin.android.ext.android.inject
-import org.koin.core.qualifier.named
 import timber.log.Timber
 
 class MainActivity : AppCompatActivity(), ProductList.Listener {
