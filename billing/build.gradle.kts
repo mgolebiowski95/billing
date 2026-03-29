@@ -9,7 +9,7 @@ kotlin {
 
 android {
     namespace = "com.mgsoftware.billing"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 24
@@ -32,11 +32,11 @@ android {
 }
 
 dependencies {
-    implementation("com.android.billingclient:billing-ktx:8.0.0")
+    implementation("com.android.billingclient:billing-ktx:8.3.0")
     implementation("com.jakewharton.timber:timber:5.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
-    implementation(platform("io.insert-koin:koin-bom:4.0.4"))
+    implementation(platform("io.insert-koin:koin-bom:4.2.0"))
     implementation("io.insert-koin:koin-android")
     implementation("io.insert-koin:koin-core")
 }

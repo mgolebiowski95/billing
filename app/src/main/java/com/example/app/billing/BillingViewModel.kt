@@ -3,9 +3,10 @@ package com.example.app.billing
 import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.crashlytics.ktx.crashlytics
-import com.google.firebase.ktx.Firebase
+import com.google.firebase.Firebase
+import com.google.firebase.crashlytics.crashlytics
 import com.mgsoftware.billing.api.BillingManager
+import com.mgsoftware.billing.api.model.ConnectionState
 import kotlinx.coroutines.launch
 
 class BillingViewModel(
@@ -19,6 +20,10 @@ class BillingViewModel(
         viewModelScope.launch {
             billingManager.connectionState().collect {
                 Firebase.crashlytics.log("BillingConnectionState=$it")
+
+                if(it == ConnectionState.CONNECTED) {
+                    billingManager.fetchProductDetails()
+                }
             }
         }
     }
@@ -33,6 +38,8 @@ class BillingViewModel(
     fun closeConnection() = billingManager.closeConnection()
 
     fun fetchPurchases() = billingManager.fetchProducts()
+
+    fun fetchProductDetails() = billingManager.fetchProductDetails()
 
     fun launchBillingFlow(
         activity: Activity,
