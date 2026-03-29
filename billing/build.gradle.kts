@@ -17,7 +17,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
 
-        version = "8.0.0-1.0.1"
+        version = "8.3.0-1.0.0"
     }
 
     buildTypes {
