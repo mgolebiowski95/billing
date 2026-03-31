@@ -38,3 +38,6 @@ google-services.json
 /keystore.properties
 
 android-gesture-detectors
+
+# Others
+release/

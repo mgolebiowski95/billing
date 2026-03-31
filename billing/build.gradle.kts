@@ -40,3 +40,25 @@ dependencies {
     implementation("io.insert-koin:koin-android")
     implementation("io.insert-koin:koin-core")
 }
+
+afterEvaluate {
+    tasks.named<AbstractArchiveTask>("debugSourcesJar") {
+        archiveFileName.set("billing-$version-sources.jar")
+    }
+}
+
+android.libraryVariants.all {
+    val variantOutput = outputs.first() as com.android.build.gradle.internal.api.LibraryVariantOutputImpl
+    variantOutput.outputFileName = "billing-$version.aar"
+}
+
+tasks.register<Copy>("prepareRelease") {
+    dependsOn(":billing:debugSourcesJar", ":billing:assembleDebug")
+
+    val sourcesJar = project.file("build/libs/billing-$version-sources.jar")
+    val aar = project.file("build/outputs/aar/billing-$version.aar")
+    val destDir = project.file("${rootProject.projectDir}/release")
+
+    from(sourcesJar, aar)
+    into(destDir)
+}
